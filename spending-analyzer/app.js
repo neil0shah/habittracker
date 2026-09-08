@@ -1,6 +1,6 @@
 import { parsePdfFile } from './pdfParser.js';
 import { categorize, CATEGORIES, CATEGORY_COLORS, NON_EXPENSE_CATEGORIES, isEssential } from './categorizer.js';
-import { renderCategoryBars, renderCashFlowBars } from './charts.js';
+import { renderCategoryBars, renderCashFlowBars, renderTrendChart } from './charts.js';
 import { loadRules, saveRules, upsertRule, applyRules, normalizeDescription } from './rules.js';
 
 const STORAGE_KEY = 'spendingAnalyzer.v1.files';
@@ -11,7 +11,7 @@ const STORAGE_KEY = 'spendingAnalyzer.v1.files';
  *   warnings: string[],
  *   transactions: Array<{key:string, date:string, description:string,
  *     amount:number, isDebit:boolean, category:string, manualCategory:boolean,
- *     excluded:boolean, signFlipped:boolean}>
+ *     excluded:boolean, signFlipped:boolean, linkedId:string|null}>
  * }>} */
 let files = loadFiles();
 // Learned corrections (category fixes, sign fixes) — stored separately from
@@ -27,6 +27,8 @@ let tableTypeFilter = 'all';
 let tableMinAmount = '';
 let tableMaxAmount = '';
 let lastTableTxnKeys = []; // keys currently shown in the table, for bulk-edit
+let linkSelection = new Set(); // transient: transaction keys picked for linking
+let trendPeriod = 'last12';
 
 const el = {
   dropZone: document.getElementById('drop-zone'),
@@ -63,6 +65,17 @@ const el = {
   bulkEditCount: document.getElementById('bulk-edit-count'),
   bulkEditCategory: document.getElementById('bulk-edit-category'),
   bulkEditApply: document.getElementById('bulk-edit-apply'),
+  linkBar: document.getElementById('link-bar'),
+  linkCount: document.getElementById('link-count'),
+  linkNet: document.getElementById('link-net'),
+  linkApply: document.getElementById('link-apply'),
+  linkClear: document.getElementById('link-clear'),
+  trendSection: document.getElementById('trend-section'),
+  trendCategory1: document.getElementById('trend-category-1'),
+  trendCategory2: document.getElementById('trend-category-2'),
+  trendCategory3: document.getElementById('trend-category-3'),
+  trendPeriod: document.getElementById('trend-period'),
+  trendChart: document.getElementById('trend-chart'),
 };
 
 init();
@@ -134,6 +147,29 @@ function init() {
     el.bulkEditCategory.appendChild(opt2);
   });
 
+  // Trend chart is about spending, so only offer expense categories.
+  const trendCategoryOptions = CATEGORIES.filter((c) => !NON_EXPENSE_CATEGORIES.includes(c));
+  const trendSelects = [el.trendCategory1, el.trendCategory2, el.trendCategory3];
+  const trendDefaults = ['Dining & Coffee', 'none', 'none'];
+  trendSelects.forEach((select, i) => {
+    const noneOpt = document.createElement('option');
+    noneOpt.value = 'none';
+    noneOpt.textContent = 'None';
+    select.appendChild(noneOpt);
+    trendCategoryOptions.forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      select.appendChild(opt);
+    });
+    select.value = trendDefaults[i];
+    select.addEventListener('change', render);
+  });
+  el.trendPeriod.addEventListener('change', () => {
+    trendPeriod = el.trendPeriod.value;
+    render();
+  });
+
   el.tableCategoryFilter.addEventListener('change', () => {
     tableCategoryFilter = el.tableCategoryFilter.value;
     render();
@@ -169,6 +205,17 @@ function init() {
     if (confirm(`Set category to "${category}" for ${keys.length} shown transaction${keys.length === 1 ? '' : 's'}?`)) {
       bulkSetCategory(keys, category);
     }
+  });
+
+  el.linkApply.addEventListener('click', () => {
+    if (linkSelection.size < 2) return;
+    if (confirm(`Link these ${linkSelection.size} transactions together? Their combined net amount will count as one entry in your totals instead of each counting separately.`)) {
+      linkSelected();
+    }
+  });
+  el.linkClear.addEventListener('click', () => {
+    linkSelection.clear();
+    render();
   });
 
   render();
@@ -227,6 +274,7 @@ function buildTransaction(parsed, accountKind, fileName) {
     manualCategory: ruleResult.category !== null,
     excluded: false,
     signFlipped: isDebit !== baseIsDebit,
+    linkedId: null,
   };
 }
 
@@ -367,13 +415,77 @@ function bulkSetCategory(txnKeys, category) {
   render();
 }
 
-// Whether a transaction counts toward the totals/charts above the table —
-// excluded transactions never do, debits count only when their category
-// isn't Income/Transfers, and credits count only when categorized Income.
+// Whether a transaction counts toward the totals/charts above the table on
+// its own — excluded transactions never do, debits count only when their
+// category isn't Income/Transfers, and credits count only when categorized
+// Income. Linked transactions are handled separately in renderTable (see
+// computeEffectiveTransactions) since a link's members count together, not
+// individually — that's a different situation from simply not counting.
 function affectsTotals(t) {
   if (t.excluded) return false;
   if (t.isDebit) return !NON_EXPENSE_CATEGORIES.includes(t.category);
   return t.category === 'Income';
+}
+
+/**
+ * Collapses linked transactions (e.g. a rent payment + a roommate's Venmo
+ * reimbursement, or a purchase + its refund) into one synthetic entry per
+ * link, whose amount is the group's net (debits minus credits) and whose
+ * category/date are borrowed from its largest-magnitude member — so a
+ * fully-offset link contributes nothing, and a partially-offset one
+ * contributes only the leftover. Unlinked transactions pass through as-is.
+ */
+function computeEffectiveTransactions(txns) {
+  const linked = new Map();
+  const result = [];
+
+  for (const t of txns) {
+    if (t.linkedId) {
+      if (!linked.has(t.linkedId)) linked.set(t.linkedId, []);
+      linked.get(t.linkedId).push(t);
+    } else {
+      result.push(t);
+    }
+  }
+
+  for (const [linkedId, members] of linked) {
+    if (members.length === 1) {
+      result.push(members[0]);
+      continue;
+    }
+    const primary = members.reduce((a, b) => (Math.abs(b.amount) > Math.abs(a.amount) ? b : a));
+    const net = members.reduce((sum, m) => sum + (m.isDebit ? m.amount : -m.amount), 0);
+    result.push({
+      ...primary,
+      key: `linked:${linkedId}`,
+      amount: Math.abs(net),
+      isDebit: net >= 0,
+      linkedId,
+      linkedMembers: members,
+    });
+  }
+
+  return result;
+}
+
+function linkSelected() {
+  if (linkSelection.size < 2) return;
+  const id = uid();
+  for (const key of linkSelection) {
+    const t = findTxn(key);
+    if (t) t.linkedId = id;
+  }
+  linkSelection.clear();
+  saveFiles();
+  render();
+}
+
+function unlink(txnKey) {
+  const t = findTxn(txnKey);
+  if (!t) return;
+  t.linkedId = null;
+  saveFiles();
+  render();
 }
 
 function applyTableFilters(txns) {
@@ -459,6 +571,7 @@ function render() {
   el.filterBar.hidden = !hasFiles;
   el.summary.hidden = !hasFiles;
   el.chartsSection.hidden = !hasFiles;
+  el.trendSection.hidden = !hasFiles;
   el.tableSection.hidden = !hasFiles;
   el.emptyState.hidden = hasFiles;
 
@@ -480,10 +593,13 @@ function renderSummaryAndTable() {
   const txns = filteredTransactions();
   const included = txns.filter((t) => !t.excluded);
   const excludedCount = txns.length - included.length;
+  // Linked transactions (e.g. rent + a roommate's reimbursement) count as
+  // one net entry, not as separate expense and transfer amounts.
+  const effective = computeEffectiveTransactions(included);
 
-  const expenseTxns = included.filter((t) => t.isDebit && !NON_EXPENSE_CATEGORIES.includes(t.category));
-  const incomeTxns = included.filter((t) => !t.isDebit && t.category === 'Income');
-  const transferTxns = included.filter((t) => t.category === 'Transfers');
+  const expenseTxns = effective.filter((t) => t.isDebit && !NON_EXPENSE_CATEGORIES.includes(t.category));
+  const incomeTxns = effective.filter((t) => !t.isDebit && t.category === 'Income');
+  const transferTxns = effective.filter((t) => t.category === 'Transfers');
 
   const totalExpense = expenseTxns.reduce((sum, t) => sum + t.amount, 0);
   const totalIncome = incomeTxns.reduce((sum, t) => sum + t.amount, 0);
@@ -534,7 +650,9 @@ function renderSummaryAndTable() {
   const tableTxns = applyTableFilters(txns);
   lastTableTxnKeys = tableTxns.map((t) => t.key);
   renderBulkEditBar(tableTxns);
+  renderLinkBar();
   renderTable(tableTxns);
+  renderTrendSection();
 }
 
 function renderBulkEditBar(tableTxns) {
@@ -545,6 +663,84 @@ function renderBulkEditBar(tableTxns) {
   if (!el.bulkEditBar.hidden) {
     el.bulkEditCount.textContent = `${tableTxns.length} transaction${tableTxns.length === 1 ? '' : 's'} shown —`;
   }
+}
+
+function renderLinkBar() {
+  const selected = [...linkSelection].map(findTxn).filter(Boolean);
+  el.linkBar.hidden = selected.length < 2;
+  if (selected.length < 2) return;
+
+  const net = selected.reduce((sum, t) => sum + (t.isDebit ? t.amount : -t.amount), 0);
+  const primary = selected.reduce((a, b) => (Math.abs(b.amount) > Math.abs(a.amount) ? b : a));
+
+  el.linkCount.textContent = `${selected.length} transactions selected —`;
+  el.linkNet.textContent = `net ${net >= 0 ? '-' : '+'}${formatCurrency(Math.abs(net))} as ${primary.category}`;
+}
+
+function addMonthsYM(ym, delta) {
+  let [y, m] = ym.split('-').map(Number);
+  m += delta;
+  while (m < 1) { m += 12; y -= 1; }
+  while (m > 12) { m -= 12; y += 1; }
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+
+function computeTrendMonths(period, expenseTxns) {
+  const curYM = todayISO().slice(0, 7);
+  let startYM, endYM;
+
+  switch (period) {
+    case 'last6': startYM = addMonthsYM(curYM, -5); endYM = curYM; break;
+    case 'last12': startYM = addMonthsYM(curYM, -11); endYM = curYM; break;
+    case 'thisYear': startYM = curYM.slice(0, 4) + '-01'; endYM = curYM; break;
+    case 'lastYear': {
+      const y = parseInt(curYM.slice(0, 4), 10) - 1;
+      startYM = `${y}-01`; endYM = `${y}-12`;
+      break;
+    }
+    case 'all':
+    default: {
+      if (expenseTxns.length === 0) return [];
+      const yms = expenseTxns.map((t) => t.date.slice(0, 7));
+      startYM = yms.reduce((a, b) => (a < b ? a : b));
+      endYM = yms.reduce((a, b) => (a > b ? a : b));
+      break;
+    }
+  }
+
+  const months = [];
+  for (let cursor = startYM; cursor <= endYM; cursor = addMonthsYM(cursor, 1)) months.push(cursor);
+  return months;
+}
+
+function renderTrendSection() {
+  const selectedCategories = [el.trendCategory1.value, el.trendCategory2.value, el.trendCategory3.value]
+    .filter((c) => c !== 'none');
+
+  // Independent of the top date-range/search filter — this chart has its
+  // own period control — but still respects exclusions and links.
+  const effective = computeEffectiveTransactions(allTransactions().filter((t) => !t.excluded));
+  const expenseTxns = effective.filter((t) => t.isDebit && !NON_EXPENSE_CATEGORIES.includes(t.category));
+
+  const months = computeTrendMonths(trendPeriod, expenseTxns);
+
+  const byCategoryMonth = new Map();
+  for (const t of expenseTxns) {
+    if (!selectedCategories.includes(t.category)) continue;
+    if (!byCategoryMonth.has(t.category)) byCategoryMonth.set(t.category, new Map());
+    const m = byCategoryMonth.get(t.category);
+    const ym = t.date.slice(0, 7);
+    m.set(ym, (m.get(ym) || 0) + t.amount);
+  }
+
+  const series = selectedCategories.map((cat) => ({
+    label: cat,
+    color: CATEGORY_COLORS[cat] || '#9ca3af',
+    values: months.map((ym) => byCategoryMonth.get(cat)?.get(ym) || 0),
+  }));
+  const monthObjs = months.map((ym) => ({ key: ym, label: monthLabel(ym) }));
+
+  renderTrendChart(el.trendChart, monthObjs, series);
 }
 
 function entry(map, key) {
@@ -623,7 +819,7 @@ function renderTable(txns) {
   if (sorted.length === 0) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 6;
+    td.colSpan = 7;
     td.className = 'table-empty';
     td.textContent = 'No transactions match the current filters.';
     tr.appendChild(td);
@@ -633,9 +829,10 @@ function renderTable(txns) {
 
   for (const t of sorted) {
     const tr = document.createElement('tr');
-    const counted = affectsTotals(t);
+    const counted = !t.linkedId && affectsTotals(t);
     const classes = [];
-    if (!counted) classes.push('row-not-counted');
+    if (t.linkedId) classes.push('row-linked');
+    else if (!counted) classes.push('row-not-counted');
     if (t.excluded) classes.push('row-excluded');
     if (classes.length) tr.className = classes.join(' ');
 
@@ -686,11 +883,39 @@ function renderTable(txns) {
     checkbox.addEventListener('change', () => setExcluded(t.key, !checkbox.checked));
     inclTd.appendChild(checkbox);
 
+    const linkTd = document.createElement('td');
+    linkTd.className = 'link-cell';
+    if (t.linkedId) {
+      const others = allTransactions().filter((x) => x.linkedId === t.linkedId && x.key !== t.key);
+      const othersDesc = others
+        .map((o) => `${o.description} (${o.isDebit ? '-' : '+'}${formatCurrency(o.amount)})`)
+        .join('; ');
+      const unlinkBtn = document.createElement('button');
+      unlinkBtn.className = 'unlink-btn';
+      unlinkBtn.textContent = '🔗';
+      unlinkBtn.title = `Linked with: ${othersDesc}. Click to remove this transaction from the link.`;
+      unlinkBtn.setAttribute('aria-label', `Unlink "${t.description}"`);
+      unlinkBtn.addEventListener('click', () => unlink(t.key));
+      linkTd.appendChild(unlinkBtn);
+    } else {
+      const linkCheckbox = document.createElement('input');
+      linkCheckbox.type = 'checkbox';
+      linkCheckbox.checked = linkSelection.has(t.key);
+      linkCheckbox.title = 'Select to link with another transaction (e.g. a reimbursement or a refund)';
+      linkCheckbox.setAttribute('aria-label', `Select "${t.description}" for linking`);
+      linkCheckbox.addEventListener('change', () => {
+        if (linkCheckbox.checked) linkSelection.add(t.key);
+        else linkSelection.delete(t.key);
+        renderLinkBar();
+      });
+      linkTd.appendChild(linkCheckbox);
+    }
+
     const srcTd = document.createElement('td');
     srcTd.className = 'source-cell';
     srcTd.textContent = t.sourceFile;
 
-    tr.append(dateTd, descTd, catTd, amtTd, inclTd, srcTd);
+    tr.append(dateTd, descTd, catTd, amtTd, inclTd, linkTd, srcTd);
     el.txnBody.appendChild(tr);
   }
 }
@@ -720,6 +945,10 @@ function loadFiles() {
       }
       if (t.signFlipped === undefined) {
         t.signFlipped = false;
+        migrated = true;
+      }
+      if (t.linkedId === undefined) {
+        t.linkedId = null;
         migrated = true;
       }
       // Earlier versions of this app used category names that have since

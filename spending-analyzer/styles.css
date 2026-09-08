@@ -246,6 +246,29 @@ button {
 @media (max-width: 720px) {
   .charts-section { grid-template-columns: 1fr; }
 }
+.trend-card { margin-bottom: 20px; }
+.trend-controls {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.trend-controls .filter-field select {
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  width: 150px;
+}
+.trend-svg { width: 100%; height: auto; overflow: visible; }
+.trend-gridline { stroke: var(--border); stroke-width: 1; }
+.trend-axis-label { fill: var(--text-muted); font-size: 10px; }
+.trend-line { fill: none; stroke-width: 2; }
+.trend-dot { stroke: var(--card-bg); stroke-width: 1.5; }
+
 .chart-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -390,13 +413,23 @@ tbody tr:last-child td { border-bottom: none; }
   max-width: 160px;
   transition: background 0.1s, border-left-color 0.1s;
 }
-.include-cell { text-align: center; }
-.include-cell input[type="checkbox"] {
+.include-cell, .link-cell { text-align: center; }
+.include-cell input[type="checkbox"],
+.link-cell input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
   accent-color: var(--accent);
 }
+.unlink-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+}
+.unlink-btn:hover { background: var(--track); }
 .amount-neutral { color: var(--text-muted); font-weight: 600; white-space: nowrap; }
 
 /* Rows that don't affect the totals above — transfers, or anything
@@ -404,6 +437,14 @@ tbody tr:last-child td { border-bottom: none; }
    at a glance while scanning the list. */
 tr.row-not-counted { background: color-mix(in srgb, var(--text-muted) 10%, transparent); }
 tr.row-not-counted:hover { background: color-mix(in srgb, var(--text-muted) 16%, transparent); }
+
+/* Linked transactions (e.g. rent + a reimbursement) count together, not
+   individually — a distinct tint from row-not-counted since this money
+   still counts, just combined with its linked partner(s). */
+tr.row-linked { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+tr.row-linked:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+.link-net-preview { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 
 /* Manually excluded (checkbox unchecked) additionally dims + strikes
    through, to distinguish "you turned this off" from "it's just a

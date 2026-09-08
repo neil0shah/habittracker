@@ -87,13 +87,44 @@
     </div>
   </section>
 
+  <section id="trend-section" class="chart-card trend-card" hidden>
+    <h2>Category trends</h2>
+    <div class="trend-controls">
+      <label class="filter-field">
+        <span>Category 1</span>
+        <select id="trend-category-1"></select>
+      </label>
+      <label class="filter-field">
+        <span>Category 2</span>
+        <select id="trend-category-2"></select>
+      </label>
+      <label class="filter-field">
+        <span>Category 3</span>
+        <select id="trend-category-3"></select>
+      </label>
+      <label class="filter-field">
+        <span>Period</span>
+        <select id="trend-period">
+          <option value="last6">Last 6 months</option>
+          <option value="last12" selected>Last 12 months</option>
+          <option value="thisYear">This year</option>
+          <option value="lastYear">Last year</option>
+          <option value="all">All time</option>
+        </select>
+      </label>
+    </div>
+    <div id="trend-chart"></div>
+  </section>
+
   <section id="table-section" class="table-section" hidden>
     <h2>Transactions</h2>
     <p class="table-hint">
       Uncheck "Include" to exclude a transaction from the totals and charts above. Gray rows
       (transfers, or anything unchecked) already aren't counted there. Click the ⇄ next to an
       amount if a statement got its sign wrong. Category and sign fixes are remembered for future
-      uploads automatically.
+      uploads automatically. Check "Link" on two or more transactions (like a shared rent payment
+      and the roommate's Venmo reimbursement, or a purchase and its refund) to combine them into
+      one net amount instead of counting each separately.
     </p>
 
     <div class="table-filter-bar">
@@ -131,6 +162,13 @@
       <button id="bulk-edit-apply" class="btn">Apply to shown transactions</button>
     </div>
 
+    <div id="link-bar" class="bulk-edit-bar" hidden>
+      <span id="link-count"></span>
+      <span id="link-net" class="link-net-preview"></span>
+      <button id="link-apply" class="btn">Link these transactions</button>
+      <button id="link-clear" class="btn btn-outline">Clear selection</button>
+    </div>
+
     <div class="table-scroll">
       <table>
         <thead>
@@ -140,6 +178,7 @@
             <th>Category</th>
             <th>Amount</th>
             <th>Include</th>
+            <th>Link</th>
             <th>Source</th>
           </tr>
         </thead>
