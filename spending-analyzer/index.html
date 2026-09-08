@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spending Analyzer</title>
+<title>Personal Finance Analysis</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Spending Analyzer</h1>
+    <h1>Personal Finance Analysis</h1>
     <p class="subtitle">
       Upload PDF statements from your bank or credit card to see where your money goes.
       Everything is parsed and stored right here in your browser — nothing is uploaded anywhere.
@@ -24,9 +24,12 @@
   </div>
 
   <div id="file-errors"></div>
-  <div id="file-list" class="file-list"></div>
 
-  <button id="reset-rules" class="btn-link" hidden></button>
+  <button id="file-list-toggle" class="collapsible-header" hidden>
+    <span id="file-list-toggle-label"></span>
+    <span id="file-list-chevron" class="chevron">▾</span>
+  </button>
+  <div id="file-list" class="file-list"></div>
 
   <div id="filter-bar" class="filter-bar" hidden>
     <label class="filter-field">
@@ -128,29 +131,29 @@
     </p>
 
     <div class="table-filter-bar">
-      <label class="filter-field">
-        <span>Category</span>
-        <select id="table-category-filter">
-          <option value="all">All categories</option>
-        </select>
-      </label>
-      <label class="filter-field">
-        <span>Type</span>
-        <select id="table-type-filter">
-          <option value="all">All</option>
-          <option value="debit">Negative (money out)</option>
-          <option value="credit">Positive (money in)</option>
-        </select>
-      </label>
-      <label class="filter-field">
-        <span>Min amount</span>
-        <input type="number" id="table-min-amount" placeholder="$0" min="0" step="0.01">
-      </label>
-      <label class="filter-field">
-        <span>Max amount</span>
-        <input type="number" id="table-max-amount" placeholder="No max" min="0" step="0.01">
-      </label>
-      <button id="table-filter-clear" class="btn btn-outline">Clear filters</button>
+      <div class="filter-field categories-field">
+        <span>Categories</span>
+        <div id="table-category-chips" class="chip-row"></div>
+      </div>
+      <div class="table-filter-row">
+        <label class="filter-field">
+          <span>Type</span>
+          <select id="table-type-filter">
+            <option value="all">All</option>
+            <option value="debit">Negative (money out)</option>
+            <option value="credit">Positive (money in)</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>Min amount</span>
+          <input type="number" id="table-min-amount" placeholder="$0" min="0" step="0.01">
+        </label>
+        <label class="filter-field">
+          <span>Amount is exactly</span>
+          <input type="number" id="table-amount-search" placeholder="e.g. 42.50" min="0" step="0.01">
+        </label>
+        <button id="table-filter-clear" class="btn btn-outline">Clear filters</button>
+      </div>
     </div>
 
     <div id="bulk-edit-bar" class="bulk-edit-bar" hidden>
@@ -186,6 +189,11 @@
       </table>
     </div>
   </section>
+
+  <div class="rules-footer">
+    <button id="reset-rules" class="btn-link" hidden></button>
+    <button id="undo-reset-rules" class="btn-link" hidden>Undo reset</button>
+  </div>
 
   <div id="empty-state" class="empty-state">
     <p>No statements uploaded yet.</p>

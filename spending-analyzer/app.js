@@ -22,19 +22,24 @@ let searchTerm = '';
 let datePreset = 'all';
 let customStart = '';
 let customEnd = '';
-let tableCategoryFilter = 'all';
+let tableCategoryFilters = new Set(); // empty = no category filter (show all)
 let tableTypeFilter = 'all';
 let tableMinAmount = '';
-let tableMaxAmount = '';
+let tableAmountSearch = '';
 let lastTableTxnKeys = []; // keys currently shown in the table, for bulk-edit
 let linkSelection = new Set(); // transient: transaction keys picked for linking
 let trendPeriod = 'last12';
+let fileListCollapsed = false;
+let lastClearedRules = null; // snapshot for "Undo reset", cleared on next real edit
 
 const el = {
   dropZone: document.getElementById('drop-zone'),
   fileInput: document.getElementById('file-input'),
   fileErrors: document.getElementById('file-errors'),
   fileList: document.getElementById('file-list'),
+  fileListToggle: document.getElementById('file-list-toggle'),
+  fileListToggleLabel: document.getElementById('file-list-toggle-label'),
+  fileListChevron: document.getElementById('file-list-chevron'),
   filterBar: document.getElementById('filter-bar'),
   datePreset: document.getElementById('date-preset'),
   customRange: document.getElementById('custom-range'),
@@ -43,6 +48,7 @@ const el = {
   search: document.getElementById('search'),
   clearAll: document.getElementById('clear-all'),
   resetRules: document.getElementById('reset-rules'),
+  undoResetRules: document.getElementById('undo-reset-rules'),
   summary: document.getElementById('summary'),
   totalSpending: document.getElementById('total-spending'),
   totalMeta: document.getElementById('total-meta'),
@@ -56,10 +62,10 @@ const el = {
   tableSection: document.getElementById('table-section'),
   txnBody: document.getElementById('txn-body'),
   emptyState: document.getElementById('empty-state'),
-  tableCategoryFilter: document.getElementById('table-category-filter'),
+  tableCategoryChips: document.getElementById('table-category-chips'),
   tableTypeFilter: document.getElementById('table-type-filter'),
   tableMinAmount: document.getElementById('table-min-amount'),
-  tableMaxAmount: document.getElementById('table-max-amount'),
+  tableAmountSearch: document.getElementById('table-amount-search'),
   tableFilterClear: document.getElementById('table-filter-clear'),
   bulkEditBar: document.getElementById('bulk-edit-bar'),
   bulkEditCount: document.getElementById('bulk-edit-count'),
@@ -128,18 +134,38 @@ function init() {
 
   el.resetRules.addEventListener('click', () => {
     if (rules.length === 0) return;
-    if (confirm(`Forget all ${rules.length} learned category/sign correction${rules.length === 1 ? '' : 's'}? This can't be undone.`)) {
+    if (confirm(`Forget all ${rules.length} learned category/sign correction${rules.length === 1 ? '' : 's'}?`)) {
+      lastClearedRules = rules;
       rules = [];
       saveRules(rules);
       render();
     }
   });
+  el.undoResetRules.addEventListener('click', () => {
+    if (!lastClearedRules) return;
+    rules = lastClearedRules;
+    lastClearedRules = null;
+    saveRules(rules);
+    render();
+  });
+
+  el.fileListToggle.addEventListener('click', () => {
+    fileListCollapsed = !fileListCollapsed;
+    render();
+  });
 
   CATEGORIES.forEach((c) => {
-    const opt1 = document.createElement('option');
-    opt1.value = c;
-    opt1.textContent = c;
-    el.tableCategoryFilter.appendChild(opt1);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = c;
+    chip.style.setProperty('--chip-color', CATEGORY_COLORS[c] || '#9ca3af');
+    chip.addEventListener('click', () => {
+      if (tableCategoryFilters.has(c)) tableCategoryFilters.delete(c);
+      else tableCategoryFilters.add(c);
+      render();
+    });
+    el.tableCategoryChips.appendChild(chip);
 
     const opt2 = document.createElement('option');
     opt2.value = c;
@@ -170,10 +196,6 @@ function init() {
     render();
   });
 
-  el.tableCategoryFilter.addEventListener('change', () => {
-    tableCategoryFilter = el.tableCategoryFilter.value;
-    render();
-  });
   el.tableTypeFilter.addEventListener('change', () => {
     tableTypeFilter = el.tableTypeFilter.value;
     render();
@@ -182,19 +204,18 @@ function init() {
     tableMinAmount = el.tableMinAmount.value;
     render();
   });
-  el.tableMaxAmount.addEventListener('input', () => {
-    tableMaxAmount = el.tableMaxAmount.value;
+  el.tableAmountSearch.addEventListener('input', () => {
+    tableAmountSearch = el.tableAmountSearch.value;
     render();
   });
   el.tableFilterClear.addEventListener('click', () => {
-    tableCategoryFilter = 'all';
+    tableCategoryFilters.clear();
     tableTypeFilter = 'all';
     tableMinAmount = '';
-    tableMaxAmount = '';
-    el.tableCategoryFilter.value = 'all';
+    tableAmountSearch = '';
     el.tableTypeFilter.value = 'all';
     el.tableMinAmount.value = '';
-    el.tableMaxAmount.value = '';
+    el.tableAmountSearch.value = '';
     render();
   });
 
@@ -348,6 +369,7 @@ function setCategory(txnKey, category) {
   t.manualCategory = true;
 
   const rule = upsertRule(rules, { matchType: 'exact', pattern: t.description, category });
+  lastClearedRules = null; // new work on top of a reset shouldn't be discardable by "Undo reset"
   saveRules(rules);
   applyRuleToLoadedTransactions(rule);
 
@@ -377,6 +399,7 @@ function flipSign(txnKey) {
   }
 
   const rule = upsertRule(rules, { matchType: 'exact', pattern: t.description, flipSign: true });
+  lastClearedRules = null;
   saveRules(rules);
   applyRuleToLoadedTransactions(rule);
 
@@ -409,6 +432,7 @@ function bulkSetCategory(txnKeys, category) {
       upsertRule(rules, { matchType: 'exact', pattern: t.description, category });
     }
   }
+  lastClearedRules = null;
   saveRules(rules);
 
   saveFiles();
@@ -490,14 +514,14 @@ function unlink(txnKey) {
 
 function applyTableFilters(txns) {
   const min = tableMinAmount === '' ? null : parseFloat(tableMinAmount);
-  const max = tableMaxAmount === '' ? null : parseFloat(tableMaxAmount);
+  const exact = tableAmountSearch === '' ? null : parseFloat(tableAmountSearch);
 
   return txns.filter((t) => {
-    if (tableCategoryFilter !== 'all' && t.category !== tableCategoryFilter) return false;
+    if (tableCategoryFilters.size > 0 && !tableCategoryFilters.has(t.category)) return false;
     if (tableTypeFilter === 'debit' && !t.isDebit) return false;
     if (tableTypeFilter === 'credit' && t.isDebit) return false;
     if (min !== null && !isNaN(min) && t.amount < min) return false;
-    if (max !== null && !isNaN(max) && t.amount > max) return false;
+    if (exact !== null && !isNaN(exact) && t.amount.toFixed(2) !== exact.toFixed(2)) return false;
     return true;
   });
 }
@@ -566,6 +590,7 @@ function render() {
   renderFileErrors();
   renderFileList();
   renderRulesControl();
+  renderCategoryChips();
 
   const hasFiles = files.length > 0;
   el.filterBar.hidden = !hasFiles;
@@ -656,8 +681,8 @@ function renderSummaryAndTable() {
 }
 
 function renderBulkEditBar(tableTxns) {
-  const narrowed = searchTerm !== '' || tableCategoryFilter !== 'all' || tableTypeFilter !== 'all' ||
-    tableMinAmount !== '' || tableMaxAmount !== '';
+  const narrowed = searchTerm !== '' || tableCategoryFilters.size > 0 || tableTypeFilter !== 'all' ||
+    tableMinAmount !== '' || tableAmountSearch !== '';
 
   el.bulkEditBar.hidden = !narrowed || tableTxns.length === 0;
   if (!el.bulkEditBar.hidden) {
@@ -753,6 +778,13 @@ function renderRulesControl() {
   if (!el.resetRules.hidden) {
     el.resetRules.textContent = `Reset ${rules.length} learned correction${rules.length === 1 ? '' : 's'}`;
   }
+  el.undoResetRules.hidden = !lastClearedRules;
+}
+
+function renderCategoryChips() {
+  for (const chip of el.tableCategoryChips.children) {
+    chip.classList.toggle('active', tableCategoryFilters.has(chip.textContent));
+  }
 }
 
 function renderFileErrors() {
@@ -767,6 +799,14 @@ function renderFileErrors() {
 }
 
 function renderFileList() {
+  el.fileListToggle.hidden = files.length === 0;
+  if (files.length > 0) {
+    el.fileListToggleLabel.textContent =
+      `${files.length} statement${files.length === 1 ? '' : 's'} uploaded`;
+    el.fileListChevron.textContent = fileListCollapsed ? '▸' : '▾';
+  }
+  el.fileList.hidden = files.length > 0 && fileListCollapsed;
+
   el.fileList.innerHTML = '';
   files.forEach((f) => {
     const row = document.createElement('div');
