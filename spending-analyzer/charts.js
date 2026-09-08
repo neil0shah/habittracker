@@ -137,3 +137,118 @@ export function renderCashFlowBars(container, items) {
 
   container.appendChild(wrap);
 }
+
+function niceCeiling(v) {
+  if (v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const norm = v / mag;
+  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return niceNorm * mag;
+}
+
+function formatCurrencyShort(n) {
+  if (n >= 1000) return `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
+  return `$${Math.round(n)}`;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Multi-line trend chart: one line per category across a sequence of
+ * months.
+ * @param {HTMLElement} container
+ * @param {{key: string, label: string}[]} months
+ * @param {{label: string, color: string, values: number[]}[]} series
+ */
+export function renderTrendChart(container, months, series) {
+  container.innerHTML = '';
+
+  if (series.length === 0) {
+    container.innerHTML = '<p class="chart-empty">Pick 1–3 categories to see their trend over time.</p>';
+    return;
+  }
+  const hasData = months.length > 0 && series.some((s) => s.values.some((v) => v > 0));
+  if (!hasData) {
+    container.innerHTML = '<p class="chart-empty">No spending in the selected categories for this period.</p>';
+    return;
+  }
+
+  const legend = document.createElement('div');
+  legend.className = 'cashflow-legend';
+  series.forEach((s) => {
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'legend-dot';
+    dot.style.background = s.color;
+    item.append(dot, s.label);
+    legend.appendChild(item);
+  });
+  container.appendChild(legend);
+
+  const W = 760, H = 260;
+  const padLeft = 56, padRight = 16, padTop = 16, padBottom = 30;
+  const plotW = W - padLeft - padRight;
+  const plotH = H - padTop - padBottom;
+
+  const maxVal = niceCeiling(Math.max(...series.flatMap((s) => s.values), 1));
+  const xFor = (i) => padLeft + (months.length === 1 ? plotW / 2 : (i / (months.length - 1)) * plotW);
+  const yFor = (v) => padTop + plotH - (v / maxVal) * plotH;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('class', 'trend-svg');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const gridCount = 4;
+  for (let g = 0; g <= gridCount; g++) {
+    const val = maxVal * (g / gridCount);
+    const y = yFor(val);
+
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', padLeft); line.setAttribute('x2', W - padRight);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('class', 'trend-gridline');
+    svg.appendChild(line);
+
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', padLeft - 8); text.setAttribute('y', y + 4);
+    text.setAttribute('class', 'trend-axis-label');
+    text.setAttribute('text-anchor', 'end');
+    text.textContent = formatCurrencyShort(val);
+    svg.appendChild(text);
+  }
+
+  const step = months.length > 18 ? 3 : months.length > 9 ? 2 : 1;
+  months.forEach((m, i) => {
+    if (i % step !== 0 && i !== months.length - 1) return;
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', xFor(i)); text.setAttribute('y', H - 8);
+    text.setAttribute('class', 'trend-axis-label');
+    text.setAttribute('text-anchor', 'middle');
+    text.textContent = m.label;
+    svg.appendChild(text);
+  });
+
+  series.forEach((s) => {
+    const points = s.values.map((v, i) => `${xFor(i)},${yFor(v)}`).join(' ');
+    const poly = document.createElementNS(SVG_NS, 'polyline');
+    poly.setAttribute('points', points);
+    poly.setAttribute('class', 'trend-line');
+    poly.style.stroke = s.color;
+    svg.appendChild(poly);
+
+    s.values.forEach((v, i) => {
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('cx', xFor(i)); c.setAttribute('cy', yFor(v)); c.setAttribute('r', 3);
+      c.setAttribute('class', 'trend-dot');
+      c.style.fill = s.color;
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = `${s.label} · ${months[i].label}: ${formatCurrency(v)}`;
+      c.appendChild(title);
+      svg.appendChild(c);
+    });
+  });
+
+  container.appendChild(svg);
+}

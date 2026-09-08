@@ -44,8 +44,9 @@ and Web Workers from `file://` origins, so it needs to be served over
   survive "Clear all data" and apply automatically to future uploads —
   fixing one Sweetgreen transaction, for example, fixes all of them, not
   just that one row.
-- **`charts.js`** — small dependency-free bar charts (category breakdown +
-  monthly cash flow) built out of plain DOM elements.
+- **`charts.js`** — small dependency-free charts (category breakdown, monthly
+  cash flow, and a multi-line category trend chart) built out of plain DOM
+  elements and inline SVG.
 - **`lib/`** — a vendored copy of pdf.js (`pdf.min.mjs` + its web worker),
   so PDF parsing works fully offline with no CDN dependency. See
   `PDFJS_LICENSE` (Apache 2.0).
@@ -64,3 +65,13 @@ and Web Workers from `file://` origins, so it needs to be served over
   flip it. That correction is remembered the same way category edits are.
 - "Clear all data" wipes uploaded statements only; learned corrections are
   kept (there's a separate "Reset N learned corrections" link for that).
+- The "Category trends" chart plots up to 3 categories' spending month by
+  month over a period you choose — independent of the date range at the
+  top, so you can compare, say, "Dining & Coffee this year" without it
+  changing your overall totals.
+- Check "Link" on two or more transactions to combine them into one net
+  amount instead of counting each separately — for a shared expense you
+  paid in full and got reimbursed for (link the payment with the
+  reimbursement), or a purchase and its refund (link them so they cancel
+  out). The combined net counts under whichever linked transaction's
+  category is largest; unlink any of them from its row to undo.
