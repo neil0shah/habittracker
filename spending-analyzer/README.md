@@ -1,4 +1,4 @@
-# Spending Analyzer
+# Personal Finance Analysis
 
 A single-page, local-only web app that turns PDF bank/credit-card statements
 into a spending summary — categorized, chartable, and filterable by date.
@@ -63,8 +63,19 @@ and Web Workers from `file://` origins, so it needs to be served over
 - If a statement gets a transaction's sign wrong (rare, but happens with
   some reward/cashback line items), click the ⇄ next to its amount to
   flip it. That correction is remembered the same way category edits are.
+- The uploaded-statements list can be collapsed (click the "N statements
+  uploaded" toggle) once you've got a few files loaded and don't need to
+  see them all the time.
+- Table filters: click category chips to filter by one or more categories
+  at once (e.g. Rent + Other together), plus Type, a minimum amount, and
+  an "Amount is exactly" search to find a specific transaction by its
+  dollar amount.
 - "Clear all data" wipes uploaded statements only; learned corrections are
-  kept (there's a separate "Reset N learned corrections" link for that).
+  kept. The "Reset N learned corrections" link lives below the
+  Transactions table (deliberately away from the frequently-used controls
+  above it) and comes with an "Undo reset" link right next to it in case
+  you click it by mistake — undo only works until you make another
+  category/sign edit, since that edit would otherwise be lost too.
 - The "Category trends" chart plots up to 3 categories' spending month by
   month over a period you choose — independent of the date range at the
   top, so you can compare, say, "Dining & Coffee this year" without it
