@@ -283,6 +283,19 @@ function render() {
 
   if (!hasFiles) return;
 
+  try {
+    renderSummaryAndTable();
+  } catch (e) {
+    console.error('Failed to render transactions', e);
+    const banner = document.createElement('div');
+    banner.className = 'banner banner-error';
+    banner.textContent = `Something went wrong rendering your transactions (${e.message}). ` +
+      `Try "Clear all data" and re-uploading your statements. If that doesn't help, please report this.`;
+    el.fileErrors.appendChild(banner);
+  }
+}
+
+function renderSummaryAndTable() {
   const txns = filteredTransactions();
   const included = txns.filter((t) => !t.excluded);
   const excludedCount = txns.length - included.length;
