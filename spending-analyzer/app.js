@@ -1,6 +1,6 @@
 import { parsePdfFile } from './pdfParser.js';
-import { categorize, CATEGORIES, CATEGORY_COLORS } from './categorizer.js';
-import { renderCategoryBars, renderMonthlyBars } from './charts.js';
+import { categorize, CATEGORIES, CATEGORY_COLORS, NON_EXPENSE_CATEGORIES } from './categorizer.js';
+import { renderCategoryBars, renderCashFlowBars } from './charts.js';
 
 const STORAGE_KEY = 'spendingAnalyzer.v1.files';
 
@@ -9,7 +9,8 @@ const STORAGE_KEY = 'spendingAnalyzer.v1.files';
  *   accountKind: 'credit_card'|'bank_account', detectedType: string,
  *   warnings: string[],
  *   transactions: Array<{key:string, date:string, description:string,
- *     amount:number, isDebit:boolean, category:string, manualCategory:boolean}>
+ *     amount:number, isDebit:boolean, category:string, manualCategory:boolean,
+ *     excluded:boolean}>
  * }>} */
 let files = loadFiles();
 let fileErrors = []; // transient, not persisted: [{fileName, message}]
@@ -33,8 +34,12 @@ const el = {
   summary: document.getElementById('summary'),
   totalSpending: document.getElementById('total-spending'),
   totalMeta: document.getElementById('total-meta'),
+  totalIncome: document.getElementById('total-income'),
+  incomeMeta: document.getElementById('income-meta'),
+  netCashflow: document.getElementById('net-cashflow'),
+  netMeta: document.getElementById('net-meta'),
   categoryChart: document.getElementById('category-chart'),
-  monthlyChart: document.getElementById('monthly-chart'),
+  cashflowChart: document.getElementById('cashflow-chart'),
   chartsSection: document.getElementById('charts-section'),
   tableSection: document.getElementById('table-section'),
   txnBody: document.getElementById('txn-body'),
@@ -136,17 +141,18 @@ function buildTransaction(parsed, accountKind, fileName) {
     description: parsed.description,
     amount,
     isDebit,
-    category: override || categorize(parsed.description, isDebit),
-    manualCategory: !!override,
+    category: override.category || categorize(parsed.description, isDebit),
+    manualCategory: !!override.category,
+    excluded: override.excluded,
   };
 }
 
 function findOverride(key) {
   for (const f of files) {
-    const match = f.transactions?.find((t) => t.key === key && t.manualCategory);
-    if (match) return match.category;
+    const match = f.transactions?.find((t) => t.key === key && (t.manualCategory || t.excluded));
+    if (match) return { category: match.manualCategory ? match.category : null, excluded: !!match.excluded };
   }
-  return null;
+  return { category: null, excluded: false };
 }
 
 function makeStableKey(date, description, amount, fileName) {
@@ -185,6 +191,18 @@ function setCategory(txnKey, category) {
     if (t) {
       t.category = category;
       t.manualCategory = true;
+      break;
+    }
+  }
+  saveFiles();
+  render();
+}
+
+function setExcluded(txnKey, excluded) {
+  for (const f of files) {
+    const t = f.transactions.find((x) => x.key === txnKey);
+    if (t) {
+      t.excluded = excluded;
       break;
     }
   }
@@ -266,34 +284,63 @@ function render() {
   if (!hasFiles) return;
 
   const txns = filteredTransactions();
-  const spendTxns = txns.filter((t) => t.isDebit && t.category !== 'Income & Transfers');
-  const total = spendTxns.reduce((sum, t) => sum + t.amount, 0);
+  const included = txns.filter((t) => !t.excluded);
+  const excludedCount = txns.length - included.length;
 
-  el.totalSpending.textContent = formatCurrency(total);
+  const expenseTxns = included.filter((t) => t.isDebit && !NON_EXPENSE_CATEGORIES.includes(t.category));
+  const incomeTxns = included.filter((t) => !t.isDebit && t.category === 'Income');
+  const transferTxns = included.filter((t) => t.category === 'Transfers');
+
+  const totalExpense = expenseTxns.reduce((sum, t) => sum + t.amount, 0);
+  const totalIncome = incomeTxns.reduce((sum, t) => sum + t.amount, 0);
+  const totalTransfers = transferTxns.reduce((sum, t) => sum + t.amount, 0);
+  const net = totalIncome - totalExpense;
+
   const { start, end } = computeDateBounds();
   const rangeLabel = start && end ? `${formatDateDisplay(start)} – ${formatDateDisplay(end)}` : 'all time';
-  el.totalMeta.textContent = `${spendTxns.length} transaction${spendTxns.length === 1 ? '' : 's'} · ${rangeLabel}`;
+  const excludedNote = excludedCount > 0 ? ` · ${excludedCount} excluded` : '';
+
+  el.totalSpending.textContent = formatCurrency(totalExpense);
+  el.totalMeta.textContent = `${expenseTxns.length} transaction${expenseTxns.length === 1 ? '' : 's'} · ${rangeLabel}${excludedNote}`;
+
+  el.totalIncome.textContent = formatCurrency(totalIncome);
+  el.incomeMeta.textContent = `${incomeTxns.length} transaction${incomeTxns.length === 1 ? '' : 's'} · ${rangeLabel}`;
+
+  el.netCashflow.textContent = `${net >= 0 ? '+' : '-'}${formatCurrency(Math.abs(net))}`;
+  el.netCashflow.className = 'summary-value ' + (net >= 0 ? 'value-credit' : 'value-debit');
+  el.netMeta.textContent = totalTransfers > 0
+    ? `${formatCurrency(totalTransfers)} moved in transfers (not counted as income or spending)`
+    : rangeLabel;
 
   const byCategory = new Map();
-  for (const t of spendTxns) {
+  for (const t of expenseTxns) {
     byCategory.set(t.category, (byCategory.get(t.category) || 0) + t.amount);
   }
   const categoryItems = [...byCategory.entries()]
     .map(([label, value]) => ({ label, value, color: CATEGORY_COLORS[label] || '#9ca3af' }))
     .sort((a, b) => b.value - a.value);
-  renderCategoryBars(el.categoryChart, categoryItems, total);
+  renderCategoryBars(el.categoryChart, categoryItems, totalExpense);
 
   const byMonth = new Map();
-  for (const t of spendTxns) {
+  for (const t of expenseTxns) {
     const ym = t.date.slice(0, 7);
-    byMonth.set(ym, (byMonth.get(ym) || 0) + t.amount);
+    entry(byMonth, ym).expense += t.amount;
+  }
+  for (const t of incomeTxns) {
+    const ym = t.date.slice(0, 7);
+    entry(byMonth, ym).income += t.amount;
   }
   const monthItems = [...byMonth.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([ym, value]) => ({ label: monthLabel(ym), value }));
-  renderMonthlyBars(el.monthlyChart, monthItems);
+    .map(([ym, v]) => ({ label: monthLabel(ym), income: v.income, expense: v.expense }));
+  renderCashFlowBars(el.cashflowChart, monthItems);
 
   renderTable(txns);
+}
+
+function entry(map, key) {
+  if (!map.has(key)) map.set(key, { income: 0, expense: 0 });
+  return map.get(key);
 }
 
 function renderFileErrors() {
@@ -360,7 +407,7 @@ function renderTable(txns) {
   if (sorted.length === 0) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 5;
+    td.colSpan = 6;
     td.className = 'table-empty';
     td.textContent = 'No transactions match the current filters.';
     tr.appendChild(td);
@@ -370,6 +417,7 @@ function renderTable(txns) {
 
   for (const t of sorted) {
     const tr = document.createElement('tr');
+    if (t.excluded) tr.className = 'row-excluded';
 
     const dateTd = document.createElement('td');
     dateTd.textContent = formatDateDisplay(t.date);
@@ -389,26 +437,67 @@ function renderTable(txns) {
       if (t.category === c) opt.selected = true;
       select.appendChild(opt);
     });
-    select.addEventListener('change', () => setCategory(t.key, select.value));
+    applyCategoryColor(select, t.category);
+    select.addEventListener('change', () => {
+      applyCategoryColor(select, select.value);
+      setCategory(t.key, select.value);
+    });
     catTd.appendChild(select);
 
     const amtTd = document.createElement('td');
     amtTd.className = t.isDebit ? 'amount-debit' : 'amount-credit';
     amtTd.textContent = `${t.isDebit ? '-' : '+'}${formatCurrency(t.amount)}`;
 
+    const inclTd = document.createElement('td');
+    inclTd.className = 'include-cell';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = !t.excluded;
+    checkbox.title = 'Include in totals and charts above';
+    checkbox.setAttribute('aria-label', `Include "${t.description}" in totals`);
+    checkbox.addEventListener('change', () => setExcluded(t.key, !checkbox.checked));
+    inclTd.appendChild(checkbox);
+
     const srcTd = document.createElement('td');
     srcTd.className = 'source-cell';
     srcTd.textContent = t.sourceFile;
 
-    tr.append(dateTd, descTd, catTd, amtTd, srcTd);
+    tr.append(dateTd, descTd, catTd, amtTd, inclTd, srcTd);
     el.txnBody.appendChild(tr);
   }
+}
+
+function applyCategoryColor(select, category) {
+  const color = CATEGORY_COLORS[category] || '#9ca3af';
+  select.style.borderLeft = `4px solid ${color}`;
+  select.style.background = `color-mix(in srgb, ${color} 16%, var(--bg))`;
 }
 
 function loadFiles() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    let migrated = false;
+
+    parsed.forEach((f) => f.transactions?.forEach((t) => {
+      if (t.excluded === undefined) {
+        t.excluded = false;
+        migrated = true;
+      }
+      // Earlier versions of this app used a single "Income & Transfers"
+      // category; re-derive the now-separate Income/Transfers split for
+      // anything auto-categorized, since we can't know which was meant.
+      if (t.category === 'Income & Transfers') {
+        t.category = t.manualCategory ? 'Transfers' : categorize(t.description, t.isDebit);
+        migrated = true;
+      }
+    }));
+
+    if (migrated) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
+    return parsed;
   } catch (e) {
     console.error('Failed to load saved statements', e);
     return [];

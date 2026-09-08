@@ -57,19 +57,29 @@ export function renderCategoryBars(container, items, totalForPercent) {
 }
 
 /**
- * Vertical bar chart: one column per month.
+ * Grouped vertical bar chart: one income bar + one expense bar per month,
+ * with the net (income − expense) shown above each pair.
  * @param {HTMLElement} container
- * @param {{label: string, value: number}[]} items
+ * @param {{label: string, income: number, expense: number}[]} items
  */
-export function renderMonthlyBars(container, items) {
+export function renderCashFlowBars(container, items) {
   container.innerHTML = '';
 
   if (items.length === 0) {
-    container.innerHTML = '<p class="chart-empty">No spending in this range yet.</p>';
+    container.innerHTML = '<p class="chart-empty">No transactions in this range yet.</p>';
     return;
   }
 
-  const max = Math.max(...items.map((i) => i.value), 1);
+  const max = Math.max(...items.map((i) => Math.max(i.income, i.expense)), 1);
+
+  const legend = document.createElement('div');
+  legend.className = 'cashflow-legend';
+  legend.innerHTML = `
+    <span class="legend-item"><span class="legend-dot legend-income"></span>Income</span>
+    <span class="legend-item"><span class="legend-dot legend-expense"></span>Expenses</span>
+  `;
+  container.appendChild(legend);
+
   const wrap = document.createElement('div');
   wrap.className = 'month-bars';
 
@@ -77,23 +87,31 @@ export function renderMonthlyBars(container, items) {
     const col = document.createElement('div');
     col.className = 'month-bar-col';
 
-    const amt = document.createElement('div');
-    amt.className = 'month-bar-amount';
-    amt.textContent = item.value > 0 ? formatCurrency(item.value) : '';
+    const net = item.income - item.expense;
+    const netEl = document.createElement('div');
+    netEl.className = 'month-bar-net ' + (net >= 0 ? 'amount-credit' : 'amount-debit');
+    netEl.textContent = `${net >= 0 ? '+' : '-'}${formatCurrency(Math.abs(net))}`;
 
     const track = document.createElement('div');
-    track.className = 'month-bar-track';
-    const fill = document.createElement('div');
-    fill.className = 'month-bar-fill';
-    fill.style.height = `${(item.value / max * 100).toFixed(1)}%`;
-    fill.title = `${item.label}: ${formatCurrency(item.value)}`;
-    track.appendChild(fill);
+    track.className = 'month-bar-track month-bar-track-grouped';
+
+    const incomeBar = document.createElement('div');
+    incomeBar.className = 'month-bar-fill month-bar-income';
+    incomeBar.style.height = `${(item.income / max * 100).toFixed(1)}%`;
+    incomeBar.title = `${item.label} income: ${formatCurrency(item.income)}`;
+
+    const expenseBar = document.createElement('div');
+    expenseBar.className = 'month-bar-fill month-bar-expense';
+    expenseBar.style.height = `${(item.expense / max * 100).toFixed(1)}%`;
+    expenseBar.title = `${item.label} expenses: ${formatCurrency(item.expense)}`;
+
+    track.append(incomeBar, expenseBar);
 
     const label = document.createElement('div');
     label.className = 'month-bar-label';
     label.textContent = item.label;
 
-    col.append(amt, track, label);
+    col.append(netEl, track, label);
     wrap.appendChild(col);
   });
 

@@ -56,10 +56,22 @@
     <button id="clear-all" class="btn btn-outline">Clear all data</button>
   </div>
 
-  <section id="summary" class="summary-card" hidden>
-    <div class="summary-label">Total spending</div>
-    <div id="total-spending" class="summary-value">$0.00</div>
-    <div id="total-meta" class="summary-meta"></div>
+  <section id="summary" class="summary-grid" hidden>
+    <div class="stat-tile">
+      <div class="summary-label">Total spending</div>
+      <div id="total-spending" class="summary-value value-debit">$0.00</div>
+      <div id="total-meta" class="summary-meta"></div>
+    </div>
+    <div class="stat-tile">
+      <div class="summary-label">Total income</div>
+      <div id="total-income" class="summary-value value-credit">$0.00</div>
+      <div id="income-meta" class="summary-meta"></div>
+    </div>
+    <div class="stat-tile">
+      <div class="summary-label">Net cash flow</div>
+      <div id="net-cashflow" class="summary-value">$0.00</div>
+      <div id="net-meta" class="summary-meta"></div>
+    </div>
   </section>
 
   <section id="charts-section" class="charts-section" hidden>
@@ -68,13 +80,17 @@
       <div id="category-chart"></div>
     </div>
     <div class="chart-card">
-      <h2>Spending by month</h2>
-      <div id="monthly-chart"></div>
+      <h2>Cash flow by month</h2>
+      <div id="cashflow-chart"></div>
     </div>
   </section>
 
   <section id="table-section" class="table-section" hidden>
     <h2>Transactions</h2>
+    <p class="table-hint">
+      Uncheck "Include" to exclude a transaction from the totals and charts above — handy for
+      things like transfers to a brokerage account that shouldn't count as spending.
+    </p>
     <div class="table-scroll">
       <table>
         <thead>
@@ -83,6 +99,7 @@
             <th>Description</th>
             <th>Category</th>
             <th>Amount</th>
+            <th>Include</th>
             <th>Source</th>
           </tr>
         </thead>
