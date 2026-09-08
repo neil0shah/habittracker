@@ -13,7 +13,8 @@ export const CATEGORIES = [
   'Bills & Utilities',
   'Health & Fitness',
   'Entertainment',
-  'Income & Transfers',
+  'Income',
+  'Transfers',
   'Other',
 ];
 
@@ -28,9 +29,15 @@ export const CATEGORY_COLORS = {
   'Bills & Utilities': '#d97706',
   'Health & Fitness': '#16a34a',
   'Entertainment': '#c026d3',
-  'Income & Transfers': '#64748b',
+  'Income': '#16a34a',
+  'Transfers': '#64748b',
   'Other': '#9ca3af',
 };
+
+// Categories that represent money moving between your own accounts or in
+// as real income — never counted as "spending", and only "Income" counts
+// toward cash-flow income.
+export const NON_EXPENSE_CATEGORIES = ['Income', 'Transfers'];
 
 // Ordered rule list — first match wins. Keep more-specific brand names
 // above broader generic words to avoid one category swallowing another.
@@ -83,13 +90,17 @@ const RULES = [
     'SKY ZONE', 'MOVIE', 'CINEMA', 'AMC ', 'REGAL', 'TICKETMASTER',
     'STUBHUB', 'CONCERT', 'MUSEUM', ' ZOO ', 'BOWLING', 'ARCADE',
   ]],
-  ['Income & Transfers', [
-    'PAYROLL', 'PAYMENT - THANK YOU', 'ONLINE PAYMENT FROM',
-    'ONLINE BANKING TRANSFER', 'ONLINE BANKING PAYMENT', 'ZELLE', 'VENMO',
-    'ROBINHOOD', 'CREDIT CARD BILL PAYMENT', 'CREDIT CARD PAYMENT',
-    'INTEREST EARNED', 'INTEREST PAID', 'CASHREWARD', 'CASH BACK',
-    'DIRECT DEPOSIT', 'REFUND', 'TRANSFER FROM', 'TRANSFER TO', 'ATM WITHDRWL',
-    'ATM DEPOSIT', 'PAYPAL TRANSFER',
+  ['Income', [
+    'PAYROLL', 'INTEREST EARNED', 'INTEREST PAID', 'CASHREWARD', 'CASH BACK',
+    'DIRECT DEPOSIT', 'REFUND', 'DIVIDEND',
+  ]],
+  ['Transfers', [
+    'PAYMENT - THANK YOU', 'ONLINE PAYMENT FROM', 'ONLINE BANKING TRANSFER',
+    'ONLINE BANKING PAYMENT', 'ZELLE', 'VENMO', 'PAYPAL TRANSFER',
+    'CREDIT CARD BILL PAYMENT', 'CREDIT CARD PAYMENT', 'TRANSFER FROM',
+    'TRANSFER TO', 'ATM WITHDRWL', 'ATM DEPOSIT',
+    'ROBINHOOD', 'FIDELITY', 'SCHWAB', 'VANGUARD', 'E*TRADE', 'ETRADE',
+    'COINBASE', 'KRAKEN', 'BROKERAGE', 'ACORNS', 'WEALTHFRONT', 'BETTERMENT',
   ]],
   ['Dining & Coffee', [
     'STARBUCKS', 'DOORDASH', 'UBER *EATS', 'UBER EATS', 'GRUBHUB',
@@ -120,5 +131,5 @@ export function categorize(description, isDebit) {
     }
   }
 
-  return isDebit ? 'Other' : 'Income & Transfers';
+  return isDebit ? 'Other' : 'Income';
 }
