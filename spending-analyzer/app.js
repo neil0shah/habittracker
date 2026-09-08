@@ -18,6 +18,11 @@ let searchTerm = '';
 let datePreset = 'all';
 let customStart = '';
 let customEnd = '';
+let tableCategoryFilter = 'all';
+let tableTypeFilter = 'all';
+let tableMinAmount = '';
+let tableMaxAmount = '';
+let lastTableTxnKeys = []; // keys currently shown in the table, for bulk-edit
 
 const el = {
   dropZone: document.getElementById('drop-zone'),
@@ -44,6 +49,15 @@ const el = {
   tableSection: document.getElementById('table-section'),
   txnBody: document.getElementById('txn-body'),
   emptyState: document.getElementById('empty-state'),
+  tableCategoryFilter: document.getElementById('table-category-filter'),
+  tableTypeFilter: document.getElementById('table-type-filter'),
+  tableMinAmount: document.getElementById('table-min-amount'),
+  tableMaxAmount: document.getElementById('table-max-amount'),
+  tableFilterClear: document.getElementById('table-filter-clear'),
+  bulkEditBar: document.getElementById('bulk-edit-bar'),
+  bulkEditCount: document.getElementById('bulk-edit-count'),
+  bulkEditCategory: document.getElementById('bulk-edit-category'),
+  bulkEditApply: document.getElementById('bulk-edit-apply'),
 };
 
 init();
@@ -91,6 +105,55 @@ function init() {
       files = [];
       saveFiles();
       render();
+    }
+  });
+
+  CATEGORIES.forEach((c) => {
+    const opt1 = document.createElement('option');
+    opt1.value = c;
+    opt1.textContent = c;
+    el.tableCategoryFilter.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = c;
+    opt2.textContent = c;
+    el.bulkEditCategory.appendChild(opt2);
+  });
+
+  el.tableCategoryFilter.addEventListener('change', () => {
+    tableCategoryFilter = el.tableCategoryFilter.value;
+    render();
+  });
+  el.tableTypeFilter.addEventListener('change', () => {
+    tableTypeFilter = el.tableTypeFilter.value;
+    render();
+  });
+  el.tableMinAmount.addEventListener('input', () => {
+    tableMinAmount = el.tableMinAmount.value;
+    render();
+  });
+  el.tableMaxAmount.addEventListener('input', () => {
+    tableMaxAmount = el.tableMaxAmount.value;
+    render();
+  });
+  el.tableFilterClear.addEventListener('click', () => {
+    tableCategoryFilter = 'all';
+    tableTypeFilter = 'all';
+    tableMinAmount = '';
+    tableMaxAmount = '';
+    el.tableCategoryFilter.value = 'all';
+    el.tableTypeFilter.value = 'all';
+    el.tableMinAmount.value = '';
+    el.tableMaxAmount.value = '';
+    render();
+  });
+
+  el.bulkEditApply.addEventListener('click', () => {
+    const keys = lastTableTxnKeys;
+    const category = el.bulkEditCategory.value;
+    if (keys.length === 0) return;
+    if (confirm(`Set category to "${category}" for ${keys.length} shown transaction${keys.length === 1 ? '' : 's'}?`)) {
+      bulkSetCategory(keys, category);
     }
   });
 
@@ -208,6 +271,43 @@ function setExcluded(txnKey, excluded) {
   }
   saveFiles();
   render();
+}
+
+function bulkSetCategory(txnKeys, category) {
+  const keySet = new Set(txnKeys);
+  for (const f of files) {
+    for (const t of f.transactions) {
+      if (keySet.has(t.key)) {
+        t.category = category;
+        t.manualCategory = true;
+      }
+    }
+  }
+  saveFiles();
+  render();
+}
+
+// Whether a transaction counts toward the totals/charts above the table —
+// excluded transactions never do, debits count only when their category
+// isn't Income/Transfers, and credits count only when categorized Income.
+function affectsTotals(t) {
+  if (t.excluded) return false;
+  if (t.isDebit) return !NON_EXPENSE_CATEGORIES.includes(t.category);
+  return t.category === 'Income';
+}
+
+function applyTableFilters(txns) {
+  const min = tableMinAmount === '' ? null : parseFloat(tableMinAmount);
+  const max = tableMaxAmount === '' ? null : parseFloat(tableMaxAmount);
+
+  return txns.filter((t) => {
+    if (tableCategoryFilter !== 'all' && t.category !== tableCategoryFilter) return false;
+    if (tableTypeFilter === 'debit' && !t.isDebit) return false;
+    if (tableTypeFilter === 'credit' && t.isDebit) return false;
+    if (min !== null && !isNaN(min) && t.amount < min) return false;
+    if (max !== null && !isNaN(max) && t.amount > max) return false;
+    return true;
+  });
 }
 
 function allTransactions() {
@@ -348,7 +448,20 @@ function renderSummaryAndTable() {
     .map(([ym, v]) => ({ label: monthLabel(ym), income: v.income, expense: v.expense }));
   renderCashFlowBars(el.cashflowChart, monthItems);
 
-  renderTable(txns);
+  const tableTxns = applyTableFilters(txns);
+  lastTableTxnKeys = tableTxns.map((t) => t.key);
+  renderBulkEditBar(tableTxns);
+  renderTable(tableTxns);
+}
+
+function renderBulkEditBar(tableTxns) {
+  const narrowed = searchTerm !== '' || tableCategoryFilter !== 'all' || tableTypeFilter !== 'all' ||
+    tableMinAmount !== '' || tableMaxAmount !== '';
+
+  el.bulkEditBar.hidden = !narrowed || tableTxns.length === 0;
+  if (!el.bulkEditBar.hidden) {
+    el.bulkEditCount.textContent = `${tableTxns.length} transaction${tableTxns.length === 1 ? '' : 's'} shown —`;
+  }
 }
 
 function entry(map, key) {
@@ -430,7 +543,11 @@ function renderTable(txns) {
 
   for (const t of sorted) {
     const tr = document.createElement('tr');
-    if (t.excluded) tr.className = 'row-excluded';
+    const counted = affectsTotals(t);
+    const classes = [];
+    if (!counted) classes.push('row-not-counted');
+    if (t.excluded) classes.push('row-excluded');
+    if (classes.length) tr.className = classes.join(' ');
 
     const dateTd = document.createElement('td');
     dateTd.textContent = formatDateDisplay(t.date);
@@ -458,7 +575,7 @@ function renderTable(txns) {
     catTd.appendChild(select);
 
     const amtTd = document.createElement('td');
-    amtTd.className = t.isDebit ? 'amount-debit' : 'amount-credit';
+    amtTd.className = counted ? (t.isDebit ? 'amount-debit' : 'amount-credit') : 'amount-neutral';
     amtTd.textContent = `${t.isDebit ? '-' : '+'}${formatCurrency(t.amount)}`;
 
     const inclTd = document.createElement('td');
