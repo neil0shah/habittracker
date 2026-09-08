@@ -88,9 +88,45 @@
   <section id="table-section" class="table-section" hidden>
     <h2>Transactions</h2>
     <p class="table-hint">
-      Uncheck "Include" to exclude a transaction from the totals and charts above — handy for
-      things like transfers to a brokerage account that shouldn't count as spending.
+      Uncheck "Include" to exclude a transaction from the totals and charts above. Gray rows
+      (transfers, or anything unchecked) already aren't counted there.
     </p>
+
+    <div class="table-filter-bar">
+      <label class="filter-field">
+        <span>Category</span>
+        <select id="table-category-filter">
+          <option value="all">All categories</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>Type</span>
+        <select id="table-type-filter">
+          <option value="all">All</option>
+          <option value="debit">Negative (money out)</option>
+          <option value="credit">Positive (money in)</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>Min amount</span>
+        <input type="number" id="table-min-amount" placeholder="$0" min="0" step="0.01">
+      </label>
+      <label class="filter-field">
+        <span>Max amount</span>
+        <input type="number" id="table-max-amount" placeholder="No max" min="0" step="0.01">
+      </label>
+      <button id="table-filter-clear" class="btn btn-outline">Clear filters</button>
+    </div>
+
+    <div id="bulk-edit-bar" class="bulk-edit-bar" hidden>
+      <span id="bulk-edit-count"></span>
+      <label class="filter-field">
+        <span>Set category to</span>
+        <select id="bulk-edit-category"></select>
+      </label>
+      <button id="bulk-edit-apply" class="btn">Apply to shown transactions</button>
+    </div>
+
     <div class="table-scroll">
       <table>
         <thead>

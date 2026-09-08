@@ -282,6 +282,51 @@ button {
   box-shadow: var(--shadow);
 }
 .table-hint { font-size: 12px; color: var(--text-muted); margin: -6px 0 14px; line-height: 1.5; }
+
+.table-filter-bar {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.table-filter-bar .filter-field select,
+.table-filter-bar .filter-field input {
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 13px;
+  width: 130px;
+}
+.table-filter-bar .btn-outline { margin-left: auto; align-self: center; }
+
+.bulk-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 10px;
+  font-size: 13px;
+}
+.bulk-edit-bar select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
 thead th {
@@ -315,10 +360,23 @@ tbody tr:last-child td { border-bottom: none; }
   cursor: pointer;
   accent-color: var(--accent);
 }
-tr.row-excluded { opacity: 0.5; }
+.amount-neutral { color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+
+/* Rows that don't affect the totals above — transfers, or anything
+   uncategorized as income/expense — get a gray highlight so it's obvious
+   at a glance while scanning the list. */
+tr.row-not-counted { background: color-mix(in srgb, var(--text-muted) 10%, transparent); }
+tr.row-not-counted:hover { background: color-mix(in srgb, var(--text-muted) 16%, transparent); }
+
+/* Manually excluded (checkbox unchecked) additionally dims + strikes
+   through, to distinguish "you turned this off" from "it's just a
+   transfer by category". */
+tr.row-excluded { opacity: 0.6; }
 tr.row-excluded .desc-cell,
 tr.row-excluded .amount-debit,
-tr.row-excluded .amount-credit { text-decoration: line-through; }
+tr.row-excluded .amount-credit,
+tr.row-excluded .amount-neutral { text-decoration: line-through; }
+
 .table-empty { text-align: center; color: var(--text-muted); padding: 24px !important; }
 
 /* Empty state */
