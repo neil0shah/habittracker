@@ -1,6 +1,7 @@
 import { parsePdfFile } from './pdfParser.js';
-import { categorize, CATEGORIES, CATEGORY_COLORS, NON_EXPENSE_CATEGORIES } from './categorizer.js';
+import { categorize, CATEGORIES, CATEGORY_COLORS, NON_EXPENSE_CATEGORIES, isEssential } from './categorizer.js';
 import { renderCategoryBars, renderCashFlowBars } from './charts.js';
+import { loadRules, saveRules, upsertRule, applyRules, normalizeDescription } from './rules.js';
 
 const STORAGE_KEY = 'spendingAnalyzer.v1.files';
 
@@ -10,9 +11,12 @@ const STORAGE_KEY = 'spendingAnalyzer.v1.files';
  *   warnings: string[],
  *   transactions: Array<{key:string, date:string, description:string,
  *     amount:number, isDebit:boolean, category:string, manualCategory:boolean,
- *     excluded:boolean}>
+ *     excluded:boolean, signFlipped:boolean}>
  * }>} */
 let files = loadFiles();
+// Learned corrections (category fixes, sign fixes) — stored separately from
+// `files` so they survive "Clear all data" and generalize to future uploads.
+let rules = loadRules();
 let fileErrors = []; // transient, not persisted: [{fileName, message}]
 let searchTerm = '';
 let datePreset = 'all';
@@ -36,6 +40,7 @@ const el = {
   customEnd: document.getElementById('custom-end'),
   search: document.getElementById('search'),
   clearAll: document.getElementById('clear-all'),
+  resetRules: document.getElementById('reset-rules'),
   summary: document.getElementById('summary'),
   totalSpending: document.getElementById('total-spending'),
   totalMeta: document.getElementById('total-meta'),
@@ -101,9 +106,18 @@ function init() {
 
   el.clearAll.addEventListener('click', () => {
     if (files.length === 0) return;
-    if (confirm('Remove all uploaded statements and category edits from this browser?')) {
+    if (confirm('Remove all uploaded statements from this browser? Your learned category/sign corrections will be kept and applied to whatever you upload next.')) {
       files = [];
       saveFiles();
+      render();
+    }
+  });
+
+  el.resetRules.addEventListener('click', () => {
+    if (rules.length === 0) return;
+    if (confirm(`Forget all ${rules.length} learned category/sign correction${rules.length === 1 ? '' : 's'}? This can't be undone.`)) {
+      rules = [];
+      saveRules(rules);
       render();
     }
   });
@@ -193,10 +207,15 @@ async function handleFiles(fileListLike) {
 
 function buildTransaction(parsed, accountKind, fileName) {
   const spendIsPositive = accountKind === 'credit_card';
-  const isDebit = spendIsPositive ? parsed.rawAmount > 0 : parsed.rawAmount < 0;
+  const baseIsDebit = spendIsPositive ? parsed.rawAmount > 0 : parsed.rawAmount < 0;
   const amount = Math.abs(parsed.rawAmount);
   const key = makeStableKey(parsed.date, parsed.description, amount, fileName);
-  const override = findOverride(key);
+
+  // Learned corrections (from past edits, persisted independently of any
+  // uploaded statement) take priority over the built-in keyword guesses.
+  const ruleResult = applyRules(rules, parsed.description, baseIsDebit);
+  const isDebit = ruleResult.isDebit;
+  const category = ruleResult.category || categorize(parsed.description, isDebit);
 
   return {
     key,
@@ -204,18 +223,43 @@ function buildTransaction(parsed, accountKind, fileName) {
     description: parsed.description,
     amount,
     isDebit,
-    category: override.category || categorize(parsed.description, isDebit),
-    manualCategory: !!override.category,
-    excluded: override.excluded,
+    category,
+    manualCategory: ruleResult.category !== null,
+    excluded: false,
+    signFlipped: isDebit !== baseIsDebit,
   };
 }
 
-function findOverride(key) {
+function findTxn(txnKey) {
   for (const f of files) {
-    const match = f.transactions?.find((t) => t.key === key && (t.manualCategory || t.excluded));
-    if (match) return { category: match.manualCategory ? match.category : null, excluded: !!match.excluded };
+    const t = f.transactions.find((x) => x.key === txnKey);
+    if (t) return t;
   }
-  return { category: null, excluded: false };
+  return null;
+}
+
+/**
+ * Retroactively apply a just-learned rule to every already-loaded
+ * transaction that matches it (not just the one(s) the user just edited),
+ * so a correction takes effect across all currently uploaded statements
+ * immediately, not only on the next upload.
+ */
+function applyRuleToLoadedTransactions(rule) {
+  for (const f of files) {
+    for (const t of f.transactions) {
+      const norm = normalizeDescription(t.description);
+      const matches = rule.matchType === 'exact' ? norm === rule.pattern : norm.includes(rule.pattern);
+      if (!matches) continue;
+      if (rule.flipSign && !t.signFlipped) {
+        t.isDebit = !t.isDebit;
+        t.signFlipped = true;
+      }
+      if (rule.category) {
+        t.category = rule.category;
+        t.manualCategory = true;
+      }
+    }
+  }
 }
 
 function makeStableKey(date, description, amount, fileName) {
@@ -249,40 +293,76 @@ function removeFile(fileId) {
 }
 
 function setCategory(txnKey, category) {
-  for (const f of files) {
-    const t = f.transactions.find((x) => x.key === txnKey);
-    if (t) {
-      t.category = category;
-      t.manualCategory = true;
-      break;
-    }
-  }
+  const t = findTxn(txnKey);
+  if (!t) return;
+
+  t.category = category;
+  t.manualCategory = true;
+
+  const rule = upsertRule(rules, { matchType: 'exact', pattern: t.description, category });
+  saveRules(rules);
+  applyRuleToLoadedTransactions(rule);
+
   saveFiles();
   render();
 }
 
 function setExcluded(txnKey, excluded) {
-  for (const f of files) {
-    const t = f.transactions.find((x) => x.key === txnKey);
-    if (t) {
-      t.excluded = excluded;
-      break;
-    }
+  const t = findTxn(txnKey);
+  if (!t) return;
+  t.excluded = excluded;
+  saveFiles();
+  render();
+}
+
+function flipSign(txnKey) {
+  const t = findTxn(txnKey);
+  if (!t) return;
+
+  t.isDebit = !t.isDebit;
+  t.signFlipped = true;
+  // The category the flipped sign implies may no longer fit — re-derive it
+  // from the built-in rules unless this transaction has its own category
+  // correction on file.
+  if (!t.manualCategory) {
+    t.category = categorize(t.description, t.isDebit);
   }
+
+  const rule = upsertRule(rules, { matchType: 'exact', pattern: t.description, flipSign: true });
+  saveRules(rules);
+  applyRuleToLoadedTransactions(rule);
+
   saveFiles();
   render();
 }
 
 function bulkSetCategory(txnKeys, category) {
   const keySet = new Set(txnKeys);
+  const targets = [];
   for (const f of files) {
     for (const t of f.transactions) {
       if (keySet.has(t.key)) {
         t.category = category;
         t.manualCategory = true;
+        targets.push(t);
       }
     }
   }
+
+  if (searchTerm) {
+    // The search term is exactly the generalization the user intended —
+    // remember it as a keyword rule so it applies to future statements too.
+    const rule = upsertRule(rules, { matchType: 'keyword', pattern: searchTerm, category });
+    applyRuleToLoadedTransactions(rule);
+  } else {
+    // No keyword to generalize from (bulk edit via the category/type/amount
+    // filters alone) — remember each affected transaction individually.
+    for (const t of targets) {
+      upsertRule(rules, { matchType: 'exact', pattern: t.description, category });
+    }
+  }
+  saveRules(rules);
+
   saveFiles();
   render();
 }
@@ -373,6 +453,7 @@ function monthLabel(ym) {
 function render() {
   renderFileErrors();
   renderFileList();
+  renderRulesControl();
 
   const hasFiles = files.length > 0;
   el.filterBar.hidden = !hasFiles;
@@ -429,10 +510,12 @@ function renderSummaryAndTable() {
   for (const t of expenseTxns) {
     byCategory.set(t.category, (byCategory.get(t.category) || 0) + t.amount);
   }
-  const categoryItems = [...byCategory.entries()]
-    .map(([label, value]) => ({ label, value, color: CATEGORY_COLORS[label] || '#9ca3af' }))
-    .sort((a, b) => b.value - a.value);
-  renderCategoryBars(el.categoryChart, categoryItems, totalExpense);
+  const toChartItem = ([label, value]) => ({ label, value, color: CATEGORY_COLORS[label] || '#9ca3af' });
+  const essentialItems = [...byCategory.entries()]
+    .filter(([label]) => isEssential(label)).map(toChartItem).sort((a, b) => b.value - a.value);
+  const nonEssentialItems = [...byCategory.entries()]
+    .filter(([label]) => !isEssential(label)).map(toChartItem).sort((a, b) => b.value - a.value);
+  renderCategoryBars(el.categoryChart, essentialItems, nonEssentialItems, totalExpense);
 
   const byMonth = new Map();
   for (const t of expenseTxns) {
@@ -467,6 +550,13 @@ function renderBulkEditBar(tableTxns) {
 function entry(map, key) {
   if (!map.has(key)) map.set(key, { income: 0, expense: 0 });
   return map.get(key);
+}
+
+function renderRulesControl() {
+  el.resetRules.hidden = rules.length === 0;
+  if (!el.resetRules.hidden) {
+    el.resetRules.textContent = `Reset ${rules.length} learned correction${rules.length === 1 ? '' : 's'}`;
+  }
 }
 
 function renderFileErrors() {
@@ -576,7 +666,15 @@ function renderTable(txns) {
 
     const amtTd = document.createElement('td');
     amtTd.className = counted ? (t.isDebit ? 'amount-debit' : 'amount-credit') : 'amount-neutral';
-    amtTd.textContent = `${t.isDebit ? '-' : '+'}${formatCurrency(t.amount)}`;
+    const amtText = document.createElement('span');
+    amtText.textContent = `${t.isDebit ? '-' : '+'}${formatCurrency(t.amount)}`;
+    const flipBtn = document.createElement('button');
+    flipBtn.className = 'flip-sign-btn';
+    flipBtn.textContent = '⇄';
+    flipBtn.title = `Flip to ${t.isDebit ? '+' : '-'}${formatCurrency(t.amount)} — use this if the statement got the sign wrong`;
+    flipBtn.setAttribute('aria-label', `Flip the sign of "${t.description}"`);
+    flipBtn.addEventListener('click', () => flipSign(t.key));
+    amtTd.append(amtText, flipBtn);
 
     const inclTd = document.createElement('td');
     inclTd.className = 'include-cell';
@@ -609,16 +707,28 @@ function loadFiles() {
     const parsed = raw ? JSON.parse(raw) : [];
     let migrated = false;
 
+    const RETIRED_CATEGORIES = {
+      'Income & Transfers': 'Transfers',
+      'Bills & Utilities': 'Utilities',
+      'Health & Fitness': 'Health Expense',
+    };
+
     parsed.forEach((f) => f.transactions?.forEach((t) => {
       if (t.excluded === undefined) {
         t.excluded = false;
         migrated = true;
       }
-      // Earlier versions of this app used a single "Income & Transfers"
-      // category; re-derive the now-separate Income/Transfers split for
-      // anything auto-categorized, since we can't know which was meant.
-      if (t.category === 'Income & Transfers') {
-        t.category = t.manualCategory ? 'Transfers' : categorize(t.description, t.isDebit);
+      if (t.signFlipped === undefined) {
+        t.signFlipped = false;
+        migrated = true;
+      }
+      // Earlier versions of this app used category names that have since
+      // been split into more specific ones; re-derive them for anything
+      // auto-categorized (we can't know which sub-category was meant for
+      // a manually-set one, so fall back to a reasonable default there).
+      const fallback = RETIRED_CATEGORIES[t.category];
+      if (fallback) {
+        t.category = t.manualCategory ? fallback : categorize(t.description, t.isDebit);
         migrated = true;
       }
     }));

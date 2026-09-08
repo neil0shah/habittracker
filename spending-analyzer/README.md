@@ -37,9 +37,15 @@ and Web Workers from `file://` origins, so it needs to be served over
   when a statement only prints `MM/DD`.
 - **`categorizer.js`** — a keyword-matching function that assigns each
   transaction a category (Groceries, Dining & Coffee, Subscriptions, etc.)
-  based on its description text.
+  based on its description text, plus which categories count as
+  "essential" for the essential/non-essential breakdown.
+- **`rules.js`** — the "learned corrections" store: category and sign fixes
+  you make by hand, saved under their own `localStorage` key so they
+  survive "Clear all data" and apply automatically to future uploads —
+  fixing one Sweetgreen transaction, for example, fixes all of them, not
+  just that one row.
 - **`charts.js`** — small dependency-free bar charts (category breakdown +
-  monthly spending) built out of plain DOM elements.
+  monthly cash flow) built out of plain DOM elements.
 - **`lib/`** — a vendored copy of pdf.js (`pdf.min.mjs` + its web worker),
   so PDF parsing works fully offline with no CDN dependency. See
   `PDFJS_LICENSE` (Apache 2.0).
@@ -49,7 +55,12 @@ and Web Workers from `file://` origins, so it needs to be served over
 - Statement type (bank account vs. credit card) is auto-detected per file
   and can be flipped manually from the dropdown next to each uploaded file
   if amounts look inverted.
-- Any transaction's category can be changed by hand from its row in the
-  table; edits are remembered even if you re-upload the same statement
-  later.
-- "Clear all data" wipes everything this app has stored in the browser.
+- Any transaction's category can be changed by hand from its row, or in
+  bulk for every transaction matching a search term — either way it's
+  remembered for future uploads (see `rules.js` above), not just applied
+  to what's currently on screen.
+- If a statement gets a transaction's sign wrong (rare, but happens with
+  some reward/cashback line items), click the ⇄ next to its amount to
+  flip it. That correction is remembered the same way category edits are.
+- "Clear all data" wipes uploaded statements only; learned corrections are
+  kept (there's a separate "Reset N learned corrections" link for that).
