@@ -155,6 +155,11 @@ button {
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--card-bg));
 }
+.banner-info {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--card-bg));
+}
 
 /* File list */
 .collapsible-header {
