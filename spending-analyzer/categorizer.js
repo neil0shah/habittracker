@@ -1,17 +1,22 @@
 // Keyword-based auto-categorization for transaction descriptions.
 // This is intentionally simple (substring matching) so it's easy to read,
 // easy to extend, and fast enough to run on every transaction with no
-// external dependency. Users can always override the result by hand.
+// external dependency. Users can always override the result by hand, and
+// corrections are remembered going forward — see rules.js.
 
 export const CATEGORIES = [
   'Groceries',
+  'Rent',
+  'Utilities',
   'Dining & Coffee',
   'Subscriptions',
+  'Car Expense',
+  'Gas',
   'Transportation',
   'Travel',
   'Shopping',
-  'Bills & Utilities',
-  'Health & Fitness',
+  'Health Expense',
+  'Fitness/Training Expense',
   'Entertainment',
   'Income',
   'Transfers',
@@ -21,13 +26,17 @@ export const CATEGORIES = [
 // Colors are picked to stay distinguishable in both light and dark themes.
 export const CATEGORY_COLORS = {
   'Groceries': '#22a06b',
+  'Rent': '#b45309',
+  'Utilities': '#d97706',
   'Dining & Coffee': '#e8734a',
   'Subscriptions': '#8b5cf6',
+  'Car Expense': '#0891b2',
+  'Gas': '#2563eb',
   'Transportation': '#3b82f6',
   'Travel': '#0ea5b7',
   'Shopping': '#db2777',
-  'Bills & Utilities': '#d97706',
-  'Health & Fitness': '#16a34a',
+  'Health Expense': '#dc2626',
+  'Fitness/Training Expense': '#65a30d',
   'Entertainment': '#c026d3',
   'Income': '#16a34a',
   'Transfers': '#64748b',
@@ -39,6 +48,18 @@ export const CATEGORY_COLORS = {
 // toward cash-flow income.
 export const NON_EXPENSE_CATEGORIES = ['Income', 'Transfers'];
 
+// For the "Essential vs. Non-Essential" breakdown. Expense categories not
+// listed here default to non-essential (including "Other" — uncategorized
+// spending shouldn't be assumed necessary).
+export const ESSENTIAL_CATEGORIES = [
+  'Groceries', 'Rent', 'Utilities', 'Car Expense', 'Gas', 'Transportation',
+  'Health Expense',
+];
+
+export function isEssential(category) {
+  return ESSENTIAL_CATEGORIES.includes(category);
+}
+
 // Ordered rule list — first match wins. Keep more-specific brand names
 // above broader generic words to avoid one category swallowing another.
 const RULES = [
@@ -46,6 +67,16 @@ const RULES = [
     "TRADER JOE", 'WHOLE FOODS', 'SAFEWAY', 'KROGER', 'ALDI', 'SPROUTS',
     'H-E-B', ' HEB ', 'PUBLIX', 'WEGMANS', 'VONS', 'RALPHS', 'FOOD LION',
     'WINCO', 'GROCERY', 'GROCER', 'FRESH MARKET', 'SMITHS FOOD',
+  ]],
+  ['Rent', [
+    'BILTRENT', 'BILT PAYMENT', 'RENT PAYMENT', 'MORTGAGE', 'APARTMENTS',
+    'PROPERTY MGMT', 'PROPERTY MANAGEMENT', 'REALTY', 'LEASING OFFICE',
+  ]],
+  ['Utilities', [
+    'COMCAST', 'XFINITY', 'AT&T', 'VERIZON', 'T-MOBILE', 'PG&E', 'PGE ',
+    'ELECTRIC', 'WATER UTIL', 'GAS UTIL', 'INTERNET SVC', 'INSURANCE',
+    'GEICO', 'STATE FARM', 'PROGRESSIVE', 'ALLSTATE', 'SURE INSURANCE',
+    'CABLE SVCS', 'UTILITY', 'PHONE BILL', 'WIRELESS',
   ]],
   ['Subscriptions', [
     'NETFLIX', 'SPOTIFY', 'HULU', 'DISNEY+', 'DISNEY PLUS', 'APPLE.COM/BILL',
@@ -55,29 +86,33 @@ const RULES = [
     'WASHINGTONPOST', 'AUDIBLE', 'PATREON', 'SIRIUSXM', 'PARAMOUNT+',
     'HBO MAX', 'PEACOCK', 'KINDLE UNLTD', 'SUBSCRIPTION',
   ]],
-  ['Bills & Utilities', [
-    'COMCAST', 'XFINITY', 'AT&T', 'VERIZON', 'T-MOBILE', 'PG&E', 'PGE ',
-    'ELECTRIC', 'WATER UTIL', 'GAS UTIL', 'INTERNET SVC', 'INSURANCE',
-    'GEICO', 'STATE FARM', 'PROGRESSIVE', 'ALLSTATE', 'SURE INSURANCE',
-    'CABLE SVCS', 'BILTRENT', 'BILT PAYMENT', 'RENT PAYMENT', 'MORTGAGE',
-    'UTILITY', 'PHONE BILL', 'WIRELESS',
+  ['Health Expense', [
+    'GROW THERAPY', 'GROWTHERAPY', 'PHARMACY', 'CVS', 'WALGREENS', 'DOCTOR',
+    'MEDICAL', 'DENTAL', 'CLINIC', 'THERAPY', 'OPTOMETR', 'UROGENT CARE',
+    'URGENT CARE', 'HEALTH',
   ]],
-  ['Health & Fitness', [
-    'GROW THERAPY', 'GROWTHERAPY', 'PHARMACY', 'CVS', 'WALGREENS', 'GYM',
-    'FITNESS', 'PLANET FITNESS', 'EQUINOX', 'DOCTOR', 'MEDICAL', 'DENTAL',
-    'CLINIC', 'THERAPY', 'HEALTH', 'OPTOMETR', 'UROGENT CARE', 'URGENT CARE',
+  ['Fitness/Training Expense', [
+    'GYM', 'FITNESS', 'PLANET FITNESS', 'EQUINOX', 'YOGA', 'PILATES',
+    'CROSSFIT', 'PELOTON', 'PERSONAL TRAINER', 'TRAINING',
   ]],
   ['Travel', [
     'UNITED ', 'DELTA ', 'SOUTHWEST', 'AMERICAN AIRLINES', 'ALASKA AIR',
     'JETBLUE', 'AIRLINES', 'AIRBNB', 'HOTEL', 'MARRIOTT', 'HILTON', 'HYATT',
     'EXPEDIA', 'BOOKING.COM', 'VRBO', 'VAN LINES', 'RESORT',
   ]],
+  ['Gas', [
+    'ARCO#', 'ARCO ', 'CHEVRON', 'SHELL OIL', 'EXXON', 'MOBIL',
+    'GAS STATION', 'COSTCO GAS', '76 ', 'VALERO', 'CIRCLE K', 'CONOCO',
+    'SUNOCO', 'PHILLIPS 66',
+  ]],
+  ['Car Expense', [
+    'PARKING', 'FASTRAK', 'TOLL', 'THRIFTY', 'HERTZ', 'AVIS',
+    'ENTERPRISE RENT', ' RAC ', 'RENTAL CAR', 'GARAGE', 'AUTO REPAIR',
+    'MECHANIC', ' DMV ', 'CAR WASH', 'OIL CHANGE', 'AUTOZONE', "O'REILLY",
+  ]],
   ['Transportation', [
-    'UBER *TRIP', 'UBER TRIP', 'LYFT', 'WAYMO', 'PARKING', 'ARCO#', 'ARCO ',
-    'CHEVRON', 'SHELL OIL', 'EXXON', 'MOBIL', 'FASTRAK', 'TOLL', 'GAS STATION',
-    'COSTCO GAS', 'BART ', 'CALTRAIN', 'MTA ', 'TAXI', 'RENTAL CAR',
-    'THRIFTY', 'HERTZ', 'AVIS', 'ENTERPRISE RENT', ' RAC ', 'TRANSIT',
-    'GARAGE',
+    'UBER *TRIP', 'UBER TRIP', 'LYFT', 'WAYMO', 'TAXI', 'BART ', 'CALTRAIN',
+    'MTA ', 'TRANSIT',
   ]],
   ['Shopping', [
     'AMAZON', 'TARGET', 'WALMART', 'WAL-MART', 'ROSS STORES', 'ABERCROMBIE',
@@ -92,7 +127,7 @@ const RULES = [
   ]],
   ['Income', [
     'PAYROLL', 'INTEREST EARNED', 'INTEREST PAID', 'CASHREWARD', 'CASH BACK',
-    'DIRECT DEPOSIT', 'REFUND', 'DIVIDEND',
+    'CASHBACK', 'DIRECT DEPOSIT', 'REFUND', 'DIVIDEND', 'BANKAMERIDEALS',
   ]],
   ['Transfers', [
     'PAYMENT - THANK YOU', 'ONLINE PAYMENT FROM', 'ONLINE BANKING TRANSFER',
@@ -109,7 +144,7 @@ const RULES = [
     'WETZEL', 'IN-N-OUT', 'CHICK-FIL-A', 'CHIPOTLE', 'PANERA', "MCDONALD",
     'WENDY', 'SUBWAY', 'DUNKIN', 'PRETZEL', 'MATCHA', 'BOBA', 'DESSERT',
     'BREW', 'TAQUERIA', 'DELI', 'ICE CREAM', 'DONUT', 'NOODLE', 'RAMEN',
-    'CUISINE', 'EATERY',
+    'CUISINE', 'EATERY', 'SWEETGREEN',
     'TST*', 'TST *', 'SQ *', 'SQ*',
   ]],
 ];

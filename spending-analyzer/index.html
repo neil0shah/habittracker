@@ -26,6 +26,8 @@
   <div id="file-errors"></div>
   <div id="file-list" class="file-list"></div>
 
+  <button id="reset-rules" class="btn-link" hidden></button>
+
   <div id="filter-bar" class="filter-bar" hidden>
     <label class="filter-field">
       <span>Date range</span>
@@ -89,7 +91,9 @@
     <h2>Transactions</h2>
     <p class="table-hint">
       Uncheck "Include" to exclude a transaction from the totals and charts above. Gray rows
-      (transfers, or anything unchecked) already aren't counted there.
+      (transfers, or anything unchecked) already aren't counted there. Click the ⇄ next to an
+      amount if a statement got its sign wrong. Category and sign fixes are remembered for future
+      uploads automatically.
     </p>
 
     <div class="table-filter-bar">
