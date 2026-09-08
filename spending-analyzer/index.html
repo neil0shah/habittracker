@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spending Analyzer</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Spending Analyzer</h1>
+    <p class="subtitle">
+      Upload PDF statements from your bank or credit card to see where your money goes.
+      Everything is parsed and stored right here in your browser — nothing is uploaded anywhere.
+    </p>
+  </header>
+
+  <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Upload PDF statements">
+    <div class="drop-zone-icon">📄</div>
+    <p><strong>Click to upload</strong> or drag and drop PDF statements here</p>
+    <p class="drop-zone-hint">Bank or credit card statement exports, one or more files at once</p>
+    <input id="file-input" type="file" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+
+  <div id="file-errors"></div>
+  <div id="file-list" class="file-list"></div>
+
+  <div id="filter-bar" class="filter-bar" hidden>
+    <label class="filter-field">
+      <span>Date range</span>
+      <select id="date-preset">
+        <option value="all" selected>All time</option>
+        <option value="last30">Last 30 days</option>
+        <option value="last90">Last 90 days</option>
+        <option value="thisMonth">This month</option>
+        <option value="thisYear">This year</option>
+        <option value="lastYear">Last year</option>
+        <option value="custom">Custom range…</option>
+      </select>
+    </label>
+    <div id="custom-range" class="custom-range" hidden>
+      <label class="filter-field">
+        <span>From</span>
+        <input type="date" id="custom-start">
+      </label>
+      <label class="filter-field">
+        <span>To</span>
+        <input type="date" id="custom-end">
+      </label>
+    </div>
+    <label class="filter-field filter-search">
+      <span>Search</span>
+      <input type="search" id="search" placeholder="Filter by description…">
+    </label>
+    <button id="clear-all" class="btn btn-outline">Clear all data</button>
+  </div>
+
+  <section id="summary" class="summary-card" hidden>
+    <div class="summary-label">Total spending</div>
+    <div id="total-spending" class="summary-value">$0.00</div>
+    <div id="total-meta" class="summary-meta"></div>
+  </section>
+
+  <section id="charts-section" class="charts-section" hidden>
+    <div class="chart-card">
+      <h2>Spending by category</h2>
+      <div id="category-chart"></div>
+    </div>
+    <div class="chart-card">
+      <h2>Spending by month</h2>
+      <div id="monthly-chart"></div>
+    </div>
+  </section>
+
+  <section id="table-section" class="table-section" hidden>
+    <h2>Transactions</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Amount</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="txn-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div id="empty-state" class="empty-state">
+    <p>No statements uploaded yet.</p>
+    <p class="empty-state-hint">
+      Export a PDF statement from your bank or credit card's online portal, then upload it above.
+      Deposits/withdrawals or purchases/payments — most standard formats are supported, and you
+      can always fix a miscategorized transaction by hand.
+    </p>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
