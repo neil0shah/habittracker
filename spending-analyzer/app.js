@@ -18,6 +18,7 @@ let files = loadFiles();
 // `files` so they survive "Clear all data" and generalize to future uploads.
 let rules = loadRules();
 let fileErrors = []; // transient, not persisted: [{fileName, message}]
+let fileNotices = []; // transient, not persisted: [{fileName, message}] — informational, not errors
 let searchTerm = '';
 let datePreset = 'all';
 let customStart = '';
@@ -245,6 +246,15 @@ function init() {
 async function handleFiles(fileListLike) {
   const pdfFiles = Array.from(fileListLike);
   fileErrors = [];
+  fileNotices = [];
+
+  // Transactions already on file (across every uploaded statement) — used to
+  // catch both a whole document re-uploaded by mistake and individual
+  // transactions that show up again in a different statement (e.g. an
+  // overlapping date range between two exports).
+  const seenSignatures = new Set(
+    allTransactions().map((t) => dupSignature(t.date, t.description, t.amount, t.isDebit))
+  );
 
   for (const file of pdfFiles) {
     const result = await parsePdfFile(file);
@@ -255,7 +265,34 @@ async function handleFiles(fileListLike) {
     }
 
     const accountKind = result.statementType === 'unknown' ? 'bank_account' : result.statementType;
-    const transactions = result.transactions.map((t) => buildTransaction(t, accountKind, file.name));
+    const parsedTransactions = result.transactions.map((t) => buildTransaction(t, accountKind, file.name));
+
+    const transactions = [];
+    let duplicateCount = 0;
+    for (const t of parsedTransactions) {
+      const sig = dupSignature(t.date, t.description, t.amount, t.isDebit);
+      if (seenSignatures.has(sig)) {
+        duplicateCount++;
+        continue;
+      }
+      seenSignatures.add(sig);
+      transactions.push(t);
+    }
+
+    if (parsedTransactions.length > 0 && transactions.length === 0) {
+      fileNotices.push({
+        fileName: result.fileName,
+        message: `This looks like a duplicate of a statement you've already uploaded — all ${parsedTransactions.length} transaction${parsedTransactions.length === 1 ? '' : 's'} were already recorded, so nothing new was added.`,
+      });
+      continue;
+    }
+
+    const warnings = [...(result.warnings || [])];
+    if (duplicateCount > 0) {
+      warnings.push(
+        `Skipped ${duplicateCount} duplicate transaction${duplicateCount === 1 ? '' : 's'} that ${duplicateCount === 1 ? 'was' : 'were'} already recorded from another statement.`
+      );
+    }
 
     files.push({
       id: uid(),
@@ -263,7 +300,7 @@ async function handleFiles(fileListLike) {
       uploadedAt: new Date().toISOString(),
       accountKind,
       detectedType: result.statementType,
-      warnings: result.warnings || [],
+      warnings,
       transactions,
     });
   }
@@ -271,6 +308,14 @@ async function handleFiles(fileListLike) {
   saveFiles();
   el.fileInput.value = '';
   render();
+}
+
+// A duplicate is the same date, description, and amount (sign included) —
+// regardless of which statement it came from. Used both to skip re-uploaded
+// documents and to catch the same transaction appearing in two overlapping
+// statements.
+function dupSignature(date, description, amount, isDebit) {
+  return `${date}|${amount.toFixed(2)}|${isDebit ? 'D' : 'C'}|${normalizeDescription(description)}`;
 }
 
 function buildTransaction(parsed, accountKind, fileName) {
@@ -520,6 +565,7 @@ function applyTableFilters(txns) {
     if (tableCategoryFilters.size > 0 && !tableCategoryFilters.has(t.category)) return false;
     if (tableTypeFilter === 'debit' && !t.isDebit) return false;
     if (tableTypeFilter === 'credit' && t.isDebit) return false;
+    if (tableTypeFilter === 'linked' && !t.linkedId) return false;
     if (min !== null && !isNaN(min) && t.amount < min) return false;
     if (exact !== null && !isNaN(exact) && t.amount.toFixed(2) !== exact.toFixed(2)) return false;
     return true;
@@ -789,11 +835,16 @@ function renderCategoryChips() {
 
 function renderFileErrors() {
   el.fileErrors.innerHTML = '';
-  if (fileErrors.length === 0) return;
   fileErrors.forEach((err) => {
     const div = document.createElement('div');
     div.className = 'banner banner-error';
     div.textContent = `${err.fileName}: ${err.message}`;
+    el.fileErrors.appendChild(div);
+  });
+  fileNotices.forEach((note) => {
+    const div = document.createElement('div');
+    div.className = 'banner banner-info';
+    div.textContent = `${note.fileName}: ${note.message}`;
     el.fileErrors.appendChild(div);
   });
 }
@@ -1001,6 +1052,23 @@ function loadFiles() {
         migrated = true;
       }
     }));
+
+    // One-time cleanup: collapse exact duplicates (same date, description,
+    // and amount) that may already be sitting in storage from before
+    // duplicate detection existed — e.g. the same statement uploaded twice,
+    // or the same transaction appearing in two overlapping exports. The
+    // first occurrence (in file-upload order) wins; later ones are dropped.
+    const seenSignatures = new Set();
+    parsed.forEach((f) => {
+      const before = f.transactions.length;
+      f.transactions = f.transactions.filter((t) => {
+        const sig = dupSignature(t.date, t.description, t.amount, t.isDebit);
+        if (seenSignatures.has(sig)) return false;
+        seenSignatures.add(sig);
+        return true;
+      });
+      if (f.transactions.length !== before) migrated = true;
+    });
 
     if (migrated) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));

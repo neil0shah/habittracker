@@ -85,4 +85,15 @@ and Web Workers from `file://` origins, so it needs to be served over
   paid in full and got reimbursed for (link the payment with the
   reimbursement), or a purchase and its refund (link them so they cancel
   out). The combined net counts under whichever linked transaction's
-  category is largest; unlink any of them from its row to undo.
+  category is largest; unlink any of them from its row to undo. Set the
+  "Type" filter to "Linked only" to see just the transactions you've linked.
+- Duplicate transactions are detected automatically. Re-uploading a
+  statement you've already added is skipped entirely (with a note saying
+  so), and any transaction that matches another one already on file —
+  same date, description, and amount, even from a different statement —
+  is kept only once. This also cleans up any duplicates already sitting
+  in your data from before this check existed, the first time the page
+  loads. Because the match is exact, two genuinely separate purchases for
+  the same amount, at the same place, on the same day will also collapse
+  into one — if that happens, the raw statement is unaffected, only what's
+  shown/counted here.
