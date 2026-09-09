@@ -15,7 +15,11 @@ import * as pdfjsLib from './lib/pdf.min.mjs';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./lib/pdf.worker.min.mjs', import.meta.url).href;
 
-const AMOUNT_RE = /-?\$?\(?\d{1,3}(?:,\d{3})*\.\d{2}\)?-?/g;
+// Some statements print a credit's minus sign with a space before the
+// digits (e.g. "- 51.96" for a refund) instead of right against them
+// ("-51.96") — the optional \s* on both sides catches that without
+// affecting statements that don't do this.
+const AMOUNT_RE = /-?\s*\$?\(?\d{1,3}(?:,\d{3})*\.\d{2}\)?\s*-?/g;
 const LEADING_DATE_RE = /^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})\b/;
 const MONTH_NAME_DATE_RE = /([A-Z][a-z]+ \d{1,2},\s*\d{4})/g;
 const SLASH_FULL_DATE_RE = /(\d{1,2}\/\d{1,2}\/\d{4})/g;
