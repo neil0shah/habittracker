@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card-bg: #ffffff;
+    --text: #1f2430;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --accent: #4f46e5;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161c;
+      --card-bg: #1d2029;
+      --text: #e7e9ee;
+      --text-muted: #9aa0ac;
+      --border: #2b2f3a;
+      --accent: #6366f1;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 48px 16px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; }
+  .subtitle { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin: 0 0 28px; }
+  .link-list { display: flex; flex-direction: column; gap: 14px; }
+  .app-link {
+    display: block;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .app-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .app-icon { font-size: 22px; margin-bottom: 6px; }
+  .app-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .app-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Finance</h1>
+  <p class="subtitle">
+    Everything here runs entirely in your browser — statements are parsed and stored locally,
+    nothing is ever uploaded anywhere.
+  </p>
+  <div class="link-list">
+    <a class="app-link" href="../spending-analyzer/index.html">
+      <div class="app-icon">💳</div>
+      <div class="app-name">Spending and Budgeting</div>
+      <div class="app-desc">
+        Upload bank and credit card statements to categorize spending, track cash flow, and see
+        where your money goes over time.
+      </div>
+    </a>
+    <a class="app-link" href="../net-worth/index.html">
+      <div class="app-icon">📈</div>
+      <div class="app-name">My Net Worth</div>
+      <div class="app-desc">
+        Upload Bank of America, Robinhood, and Transamerica statements to track your net worth —
+        assets minus liabilities — over time.
+      </div>
+    </a>
+  </div>
+</div>
+</body>
+</html>
