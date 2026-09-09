@@ -8,7 +8,7 @@
 </head>
 <body>
 <div class="wrap">
-  <a class="back-link" href="../finance/index.html">← Finance</a>
+  <a class="back-link" href="../index.html">← Finance</a>
   <header>
     <h1>Spending and Budgeting</h1>
     <p class="subtitle">
@@ -178,10 +178,10 @@
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Description</th>
-            <th>Category</th>
-            <th>Amount</th>
+            <th class="sortable" data-sort="date"><span>Date</span><span class="sort-indicator"></span></th>
+            <th class="sortable" data-sort="description"><span>Description</span><span class="sort-indicator"></span></th>
+            <th class="sortable" data-sort="category"><span>Category</span><span class="sort-indicator"></span></th>
+            <th class="sortable" data-sort="amount"><span>Amount</span><span class="sort-indicator"></span></th>
             <th>Include</th>
             <th>Link</th>
             <th>Source</th>
@@ -193,6 +193,7 @@
   </section>
 
   <div class="rules-footer">
+    <a href="data-monitoring.html" class="btn-link">Data Monitoring — review learned corrections</a>
     <button id="reset-rules" class="btn-link" hidden></button>
     <button id="undo-reset-rules" class="btn-link" hidden>Undo reset</button>
   </div>

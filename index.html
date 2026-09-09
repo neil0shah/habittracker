@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Habit Tracker</title>
+<title>Finance</title>
 <style>
   :root {
     --bg: #f6f7f9;
@@ -12,15 +12,8 @@
     --text-muted: #6b7280;
     --border: #e5e7eb;
     --accent: #4f46e5;
-    --accent-hover: #4338ca;
-    --danger: #dc2626;
-    --danger-hover: #b91c1c;
-    --cell-empty: #e9ebef;
-    --cell-filled: #4f46e5;
-    --cell-today-ring: #f59e0b;
     --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   }
-
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #14161c;
@@ -29,474 +22,63 @@
       --text-muted: #9aa0ac;
       --border: #2b2f3a;
       --accent: #6366f1;
-      --accent-hover: #7577f3;
-      --danger: #ef4444;
-      --danger-hover: #f87171;
-      --cell-empty: #2a2e38;
-      --cell-filled: #6366f1;
-      --cell-today-ring: #fbbf24;
       --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
     }
   }
-
   * { box-sizing: border-box; }
-
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    padding: 24px 16px 64px;
+    padding: 48px 16px;
   }
-
-  .wrap {
-    max-width: 680px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
-
-  .subtitle {
-    color: var(--text-muted);
-    font-size: 14px;
-    margin: 0 0 24px;
-  }
-
-  .add-form {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 28px;
-  }
-
-  .add-form input {
-    flex: 1;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--card-bg);
-    color: var(--text);
-    font-size: 14px;
-  }
-
-  .add-form input:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-  }
-
-  button {
-    font-family: inherit;
-    cursor: pointer;
-  }
-
-  .btn {
-    padding: 10px 16px;
-    border-radius: 8px;
-    border: none;
-    background: var(--accent);
-    color: white;
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  .btn:hover { background: var(--accent-hover); }
-
-  .habit-list {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .habit-card {
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; }
+  .subtitle { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin: 0 0 28px; }
+  .link-list { display: flex; flex-direction: column; gap: 14px; }
+  .app-link {
+    display: block;
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 18px;
+    border-radius: 14px;
+    padding: 20px 22px;
     box-shadow: var(--shadow);
-  }
-
-  .habit-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .habit-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .habit-name {
-    font-size: 16px;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .habit-name-input {
-    font-size: 16px;
-    font-weight: 600;
-    padding: 4px 6px;
-    border-radius: 6px;
-    border: 1px solid var(--accent);
-    background: var(--bg);
+    text-decoration: none;
     color: var(--text);
-    width: 100%;
+    transition: border-color 0.15s, transform 0.1s;
   }
-
-  .icon-btn {
-    background: transparent;
-    border: none;
-    padding: 4px;
-    border-radius: 6px;
-    color: var(--text-muted);
-    font-size: 15px;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .icon-btn:hover {
-    background: var(--cell-empty);
-    color: var(--text);
-  }
-
-  .icon-btn.danger:hover {
-    color: var(--danger-hover);
-  }
-
-  .habit-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .habit-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .streak {
-    font-size: 13px;
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-
-  .streak .flame { margin-right: 2px; }
-
-  .done-btn {
-    padding: 8px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .done-btn:hover {
-    background: var(--accent);
-    color: white;
-  }
-
-  .done-btn.is-done {
-    background: var(--accent);
-    color: white;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    gap: 4px;
-  }
-
-  .cell {
-    aspect-ratio: 1 / 1;
-    border-radius: 4px;
-    background: var(--cell-empty);
-  }
-
-  .cell.filled {
-    background: var(--cell-filled);
-  }
-
-  .cell.today {
-    box-shadow: 0 0 0 2px var(--cell-today-ring) inset;
-  }
-
-  .empty-state {
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 14px;
-    padding: 40px 20px;
-    border: 1px dashed var(--border);
-    border-radius: 12px;
-  }
+  .app-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .app-icon { font-size: 22px; margin-bottom: 6px; }
+  .app-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .app-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Habit Tracker</h1>
-  <p class="subtitle">Track your habits day by day. Everything is saved in this browser.</p>
-
-  <form class="add-form" id="add-form">
-    <input type="text" id="habit-input" placeholder="Add a new habit… (e.g. Drink water)" maxlength="60" autocomplete="off">
-    <button type="submit" class="btn">Add Habit</button>
-  </form>
-
-  <div class="habit-list" id="habit-list"></div>
+  <h1>Finance</h1>
+  <p class="subtitle">
+    Everything here runs entirely in your browser — statements are parsed and stored locally,
+    nothing is ever uploaded anywhere.
+  </p>
+  <div class="link-list">
+    <a class="app-link" href="spending-analyzer/index.html">
+      <div class="app-icon">💳</div>
+      <div class="app-name">Spending and Budgeting</div>
+      <div class="app-desc">
+        Upload bank and credit card statements to categorize spending, track cash flow, and see
+        where your money goes over time.
+      </div>
+    </a>
+    <a class="app-link" href="net-worth/index.html">
+      <div class="app-icon">📈</div>
+      <div class="app-name">My Net Worth</div>
+      <div class="app-desc">
+        Upload Bank of America, Robinhood, and Transamerica statements to track your net worth —
+        assets minus liabilities — over time.
+      </div>
+    </a>
+  </div>
 </div>
-
-<script>
-(function () {
-  const STORAGE_KEY = 'habitTrackerData';
-  const DAYS_TO_SHOW = 30;
-
-  /** @typedef {{ id: string, name: string, createdAt: string, completions: Record<string, boolean> }} Habit */
-
-  /** @returns {Habit[]} */
-  function loadHabits() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      console.error('Failed to load habits from localStorage', e);
-      return [];
-    }
-  }
-
-  /** @param {Habit[]} habits */
-  function saveHabits(habits) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
-  }
-
-  function dateKey(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
-  function startOfToday() {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-
-  function formatDateLong(date) {
-    return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-
-  function isCompletedOn(habit, date) {
-    return !!habit.completions[dateKey(date)];
-  }
-
-  function calcStreak(habit) {
-    const today = startOfToday();
-    let cursor = new Date(today);
-    let streak = 0;
-
-    // If today isn't marked yet, that alone shouldn't reset the streak —
-    // start counting from yesterday instead, since today isn't over.
-    if (!isCompletedOn(habit, cursor)) {
-      cursor.setDate(cursor.getDate() - 1);
-    }
-
-    while (isCompletedOn(habit, cursor)) {
-      streak++;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-
-    return streak;
-  }
-
-  function uid() {
-    return 'h_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-  }
-
-  let habits = loadHabits();
-
-  const listEl = document.getElementById('habit-list');
-  const formEl = document.getElementById('add-form');
-  const inputEl = document.getElementById('habit-input');
-
-  function render() {
-    listEl.innerHTML = '';
-
-    if (habits.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.textContent = 'No habits yet. Add one above to get started.';
-      listEl.appendChild(empty);
-      return;
-    }
-
-    const today = startOfToday();
-
-    habits.forEach((habit) => {
-      const card = document.createElement('div');
-      card.className = 'habit-card';
-
-      // Header: name + edit/delete
-      const header = document.createElement('div');
-      header.className = 'habit-header';
-
-      const titleWrap = document.createElement('div');
-      titleWrap.className = 'habit-title';
-
-      const nameEl = document.createElement('span');
-      nameEl.className = 'habit-name';
-      nameEl.textContent = habit.name;
-      titleWrap.appendChild(nameEl);
-
-      header.appendChild(titleWrap);
-
-      const actions = document.createElement('div');
-      actions.className = 'habit-actions';
-
-      const renameBtn = document.createElement('button');
-      renameBtn.className = 'icon-btn';
-      renameBtn.title = 'Rename habit';
-      renameBtn.setAttribute('aria-label', 'Rename habit');
-      renameBtn.textContent = '✏️';
-      renameBtn.addEventListener('click', () => startRename(habit, nameEl, titleWrap));
-      actions.appendChild(renameBtn);
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'icon-btn danger';
-      deleteBtn.title = 'Delete habit';
-      deleteBtn.setAttribute('aria-label', 'Delete habit');
-      deleteBtn.textContent = '🗑️';
-      deleteBtn.addEventListener('click', () => {
-        if (confirm(`Delete "${habit.name}"? This can't be undone.`)) {
-          habits = habits.filter((h) => h.id !== habit.id);
-          saveHabits(habits);
-          render();
-        }
-      });
-      actions.appendChild(deleteBtn);
-
-      header.appendChild(actions);
-      card.appendChild(header);
-
-      // Meta row: streak + done button
-      const meta = document.createElement('div');
-      meta.className = 'habit-meta';
-
-      const streakEl = document.createElement('div');
-      streakEl.className = 'streak';
-      const streak = calcStreak(habit);
-      streakEl.innerHTML = `<span class="flame">🔥</span>${streak} day${streak === 1 ? '' : 's'} streak`;
-      meta.appendChild(streakEl);
-
-      const doneToday = isCompletedOn(habit, today);
-      const doneBtn = document.createElement('button');
-      doneBtn.className = 'done-btn' + (doneToday ? ' is-done' : '');
-      doneBtn.textContent = doneToday ? '✓ Done today' : 'Mark done today';
-      doneBtn.addEventListener('click', () => {
-        const key = dateKey(today);
-        if (habit.completions[key]) {
-          delete habit.completions[key];
-        } else {
-          habit.completions[key] = true;
-        }
-        saveHabits(habits);
-        render();
-      });
-      meta.appendChild(doneBtn);
-
-      card.appendChild(meta);
-
-      // 30-day grid
-      const grid = document.createElement('div');
-      grid.className = 'grid';
-
-      const cellDates = [];
-      for (let i = DAYS_TO_SHOW - 1; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        cellDates.push(d);
-      }
-
-      cellDates.forEach((d) => {
-        const cell = document.createElement('div');
-        const filled = isCompletedOn(habit, d);
-        const isToday = dateKey(d) === dateKey(today);
-        cell.className = 'cell' + (filled ? ' filled' : '') + (isToday ? ' today' : '');
-        cell.title = `${formatDateLong(d)}${filled ? ' — done' : ''}`;
-        grid.appendChild(cell);
-      });
-
-      card.appendChild(grid);
-      listEl.appendChild(card);
-    });
-  }
-
-  function startRename(habit, nameEl, titleWrap) {
-    const input = document.createElement('input');
-    input.className = 'habit-name-input';
-    input.type = 'text';
-    input.maxLength = 60;
-    input.value = habit.name;
-
-    titleWrap.replaceChild(input, nameEl);
-    input.focus();
-    input.select();
-
-    function commit() {
-      const newName = input.value.trim();
-      if (newName) {
-        habit.name = newName;
-        saveHabits(habits);
-      }
-      render();
-    }
-
-    input.addEventListener('blur', commit);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        input.blur();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        render();
-      }
-    });
-  }
-
-  formEl.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = inputEl.value.trim();
-    if (!name) return;
-
-    habits.push({
-      id: uid(),
-      name,
-      createdAt: new Date().toISOString(),
-      completions: {}
-    });
-    saveHabits(habits);
-    inputEl.value = '';
-    render();
-  });
-
-  render();
-})();
-</script>
 </body>
 </html>

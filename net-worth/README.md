@@ -78,7 +78,18 @@ statement for it.
 - Re-uploading a statement for a date you already have replaces that
   snapshot rather than creating a duplicate.
 - Accounts without a statement to upload (or where a PDF doesn't parse) can
-  be added and updated by hand from the form below the accounts list.
+  be added and updated by hand from the form below the accounts list — the
+  institution field is free text, so it isn't limited to the three
+  statement formats this app can parse.
 - If a statement is auto-matched to the wrong account (rare, but possible
   if account-number formatting varies), remove the account and re-add the
   balance manually, or under the correct existing one.
+- Each account collapses to just its name and latest balance — click the
+  ▸/▾ toggle to expand it and see (or edit) its full balance history.
+  Uploading a statement for a brand-new account expands it automatically so
+  you can check the first parse; existing accounts stay collapsed on new
+  uploads.
+- The "Net worth over time" chart labels the X-axis roughly every 6 months
+  (e.g. "Jan 2025", "Jul 2025") rather than at every data point, since your
+  balance snapshots land on whatever dates your statements happen to close
+  on, not evenly-spaced months.

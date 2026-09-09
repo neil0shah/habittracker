@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Monitoring</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="data-monitoring.css">
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">← Spending and Budgeting</a>
+  <header>
+    <h1>Data Monitoring</h1>
+    <p class="subtitle">
+      Every learned correction you've made — category or sign fixes — compared against what the
+      built-in categorizer would guess today, so you can confirm your changes are right, catch any
+      that aren't, and spot patterns worth turning into a permanent rule.
+    </p>
+  </header>
+
+  <section id="summary" class="summary-grid" hidden>
+    <div class="stat-tile">
+      <div class="summary-label">Learned corrections</div>
+      <div id="total-rules" class="summary-value">0</div>
+      <div class="summary-meta">exact + keyword rules combined</div>
+    </div>
+    <div class="stat-tile">
+      <div class="summary-label">Transactions affected</div>
+      <div id="total-affected" class="summary-value">0</div>
+      <div class="summary-meta">currently loaded, matching at least one rule</div>
+    </div>
+    <div class="stat-tile">
+      <div class="summary-label">Stale corrections</div>
+      <div id="total-stale" class="summary-value">0</div>
+      <div class="summary-meta">match no currently-loaded transaction</div>
+    </div>
+  </section>
+
+  <section id="by-category-section" class="chart-card" hidden>
+    <h2>Corrections by category</h2>
+    <p class="table-hint">
+      Categories that keep needing manual correction are candidates for a new built-in keyword —
+      the more transactions landing here, the stronger the pattern.
+    </p>
+    <div id="by-category-list" class="by-category-list"></div>
+  </section>
+
+  <section id="rules-section" class="table-section" hidden>
+    <h2>Corrections</h2>
+    <p class="table-hint">
+      Click a row to see exactly which currently-loaded transactions it affects. Edit the category
+      or sign right here to fix a mistake — it's applied to every matching transaction immediately.
+      Deleting a correction stops it from applying to future uploads, but doesn't change
+      transactions it already corrected (fix those from the Transactions table itself).
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Match</th>
+            <th>Category correction</th>
+            <th>Sign correction</th>
+            <th>Affects</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rules-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div id="empty-state" class="empty-state">
+    <p>No learned corrections yet.</p>
+    <p class="empty-state-hint">
+      Change a transaction's category or flip its sign on the
+      <a href="index.html">Transactions table</a> and it'll show up here.
+    </p>
+  </div>
+</div>
+
+<script type="module" src="data-monitoring.js"></script>
+</body>
+</html>

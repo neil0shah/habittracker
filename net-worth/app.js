@@ -17,6 +17,7 @@ const INSTITUTION_COLORS = {
  * }>} */
 let accounts = loadAccounts();
 let fileErrors = []; // transient: [{fileName, message}]
+let expandedAccounts = new Set(); // account ids currently expanded; collapsed by default
 
 const el = {
   dropZone: document.getElementById('drop-zone'),
@@ -69,16 +70,19 @@ function init() {
   el.addAccountForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const name = el.newAccountName.value.trim();
+    const institution = el.newAccountInstitution.value.trim() || 'Other';
     if (!name) return;
 
-    accounts.push({
+    const newAccount = {
       id: uid(),
       key: `manual:${uid()}`,
       name,
-      institution: el.newAccountInstitution.value,
+      institution,
       kind: el.newAccountKind.value,
       snapshots: [],
-    });
+    };
+    accounts.push(newAccount);
+    expandedAccounts.add(newAccount.id);
     saveAccounts();
     el.newAccountName.value = '';
     render();
@@ -110,6 +114,7 @@ async function handleFiles(fileListLike) {
         snapshots: [],
       };
       accounts.push(account);
+      expandedAccounts.add(account.id); // show a brand-new account's first parsed balance so it can be checked
     }
 
     upsertSnapshot(account, { date: result.date, balance: result.balance, source: 'pdf', fileName: result.fileName });
@@ -276,6 +281,10 @@ function renderCharts(checkpoints) {
   renderNetWorthChart(el.netWorthChart, points, series);
 
   const latest = checkpoints[checkpoints.length - 1];
+  if (!latest) {
+    renderAccountBars(el.accountChart, [], []);
+    return;
+  }
   const toItem = (a) => ({
     label: a.name,
     value: balanceAsOf(a, latest.date) || 0,
@@ -297,8 +306,23 @@ function renderAccountList() {
     const card = document.createElement('div');
     card.className = 'account-card';
 
+    const expanded = expandedAccounts.has(account.id);
+
     const header = document.createElement('div');
     header.className = 'account-header';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'account-toggle';
+    toggleBtn.textContent = expanded ? '▾' : '▸';
+    toggleBtn.title = expanded ? 'Collapse' : 'Expand';
+    toggleBtn.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} "${account.name}"`);
+    toggleBtn.addEventListener('click', () => {
+      if (expandedAccounts.has(account.id)) expandedAccounts.delete(account.id);
+      else expandedAccounts.add(account.id);
+      render();
+    });
+    header.appendChild(toggleBtn);
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
@@ -339,6 +363,11 @@ function renderAccountList() {
       ? `${formatCurrency(latestBalance.balance)} as of ${formatDateDisplay(latestBalance.date)}`
       : 'No balance yet';
     card.appendChild(currentEl);
+
+    if (!expanded) {
+      el.accountList.appendChild(card);
+      continue;
+    }
 
     if (account.snapshots.length > 0) {
       const table = document.createElement('table');

@@ -450,6 +450,14 @@ thead th {
   border-bottom: 1px solid var(--border);
   padding: 8px 10px;
 }
+thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th.sortable:hover { color: var(--text); }
+thead th.sortable.sort-active { color: var(--accent); }
+.sort-indicator { display: inline-block; width: 10px; font-size: 9px; }
 tbody td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: none; }
 .desc-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

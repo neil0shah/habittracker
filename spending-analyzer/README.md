@@ -50,6 +50,11 @@ and Web Workers from `file://` origins, so it needs to be served over
 - **`lib/`** — a vendored copy of pdf.js (`pdf.min.mjs` + its web worker),
   so PDF parsing works fully offline with no CDN dependency. See
   `PDFJS_LICENSE` (Apache 2.0).
+- **`data-monitoring.html` / `data-monitoring.js` / `data-monitoring.css`** —
+  a separate page reusing `categorizer.js` and `rules.js` directly (no
+  duplicated logic) to list every learned correction against what the
+  built-in categorizer would guess today, for reviewing accuracy and
+  spotting patterns. See "Data Monitoring" below.
 
 ## Notes
 
@@ -104,3 +109,25 @@ and Web Workers from `file://` origins, so it needs to be served over
   the same amount, at the same place, on the same day will also collapse
   into one — if that happens, the raw statement is unaffected, only what's
   shown/counted here.
+- Click any Transactions column header (Date, Description, Category,
+  Amount) to sort by it, Excel-style; click it again to reverse the
+  direction. The active column is highlighted with an arrow showing which
+  way it's sorted.
+
+## Data Monitoring
+
+A separate page (linked at the bottom of the main Transactions table) for
+auditing every learned correction you've made. For each one it shows the
+category the built-in categorizer would guess today next to what you
+corrected it to (or the sign it would guess vs. what you flipped it to),
+plus exactly which currently-loaded transactions the correction is
+governing right now — so you can confirm a fix was right, catch one that
+wasn't, and edit the category or sign directly from that page (applied to
+every matching transaction immediately). A "Corrections by category" panel
+sums how many corrections and transactions land in each category, which is
+the fastest way to spot a pattern worth turning into a permanent keyword in
+`categorizer.js`. A correction that matches zero currently-loaded
+transactions is marked stale — usually because the statement it corrected
+was removed — and can be deleted without affecting anything still on
+screen; deleting any correction only stops it from applying to future
+uploads; it doesn't undo transactions it already corrected.
