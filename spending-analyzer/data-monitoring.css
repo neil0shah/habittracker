@@ -1,0 +1,73 @@
+/* Data Monitoring page — layered on top of styles.css's shared theme/vars. */
+
+.by-category-list { display: flex; flex-direction: column; gap: 10px; }
+.by-category-row { display: grid; grid-template-columns: 160px 1fr 90px; align-items: center; gap: 10px; }
+.by-category-label { display: flex; align-items: center; gap: 6px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.by-category-track { background: var(--track); border-radius: 6px; height: 10px; overflow: hidden; }
+.by-category-fill { height: 100%; border-radius: 6px; min-width: 3px; background: var(--accent); }
+.by-category-count { font-size: 12px; color: var(--text-muted); text-align: right; white-space: nowrap; }
+
+.rule-toggle {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.rule-toggle:hover { background: var(--track); color: var(--text); }
+
+tr.rule-row { cursor: pointer; }
+tr.rule-row:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+tr.rule-row.stale-row { opacity: 0.55; }
+
+.rule-pattern { font-size: 12px; }
+.rule-pattern .match-type {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+.rule-pattern .pattern-text { font-weight: 600; }
+
+.correction-cell { font-size: 12px; }
+.correction-arrow { color: var(--text-muted); margin: 0 4px; }
+.correction-none { color: var(--text-muted); }
+.correction-cell select {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12px;
+}
+.correction-cell label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.affects-count { font-size: 12px; font-weight: 600; }
+.affects-count.zero { color: var(--text-muted); font-weight: 400; }
+
+tr.rule-detail-row td {
+  background: var(--bg);
+  padding: 10px 14px !important;
+}
+.detail-empty { color: var(--text-muted); font-size: 12px; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.detail-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+.detail-table td { padding: 4px 8px; }
+.detail-table tr:nth-child(odd) td { background: color-mix(in srgb, var(--text-muted) 5%, transparent); }

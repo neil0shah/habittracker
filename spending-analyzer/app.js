@@ -32,6 +32,8 @@ let linkSelection = new Set(); // transient: transaction keys picked for linking
 let trendPeriod = 'last12';
 let fileListCollapsed = false;
 let lastClearedRules = null; // snapshot for "Undo reset", cleared on next real edit
+let tableSortColumn = 'date';
+let tableSortDirection = 'desc';
 
 const el = {
   dropZone: document.getElementById('drop-zone'),
@@ -218,6 +220,21 @@ function init() {
     el.tableMinAmount.value = '';
     el.tableAmountSearch.value = '';
     render();
+  });
+
+  document.querySelectorAll('th.sortable').forEach((th) => {
+    th.addEventListener('click', () => {
+      const column = th.dataset.sort;
+      if (tableSortColumn === column) {
+        tableSortDirection = tableSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        tableSortColumn = column;
+        // Newest/largest first reads more naturally for date and amount;
+        // A-Z reads more naturally for text columns.
+        tableSortDirection = column === 'date' || column === 'amount' ? 'desc' : 'asc';
+      }
+      render();
+    });
   });
 
   el.bulkEditApply.addEventListener('click', () => {
@@ -903,9 +920,29 @@ function renderFileList() {
   });
 }
 
+function compareTxnsBy(a, b, column) {
+  switch (column) {
+    case 'description': return a.description.localeCompare(b.description);
+    case 'category': return a.category.localeCompare(b.category);
+    case 'amount': return a.amount - b.amount;
+    case 'date':
+    default: return a.date.localeCompare(b.date);
+  }
+}
+
+function renderSortIndicators() {
+  document.querySelectorAll('th.sortable').forEach((th) => {
+    const active = th.dataset.sort === tableSortColumn;
+    th.classList.toggle('sort-active', active);
+    th.querySelector('.sort-indicator').textContent = active ? (tableSortDirection === 'asc' ? '▲' : '▼') : '';
+  });
+}
+
 function renderTable(txns) {
   el.txnBody.innerHTML = '';
-  const sorted = [...txns].sort((a, b) => b.date.localeCompare(a.date));
+  renderSortIndicators();
+  const dir = tableSortDirection === 'asc' ? 1 : -1;
+  const sorted = [...txns].sort((a, b) => dir * compareTxnsBy(a, b, tableSortColumn));
 
   if (sorted.length === 0) {
     const tr = document.createElement('tr');

@@ -26,6 +26,42 @@ function formatCurrencyShort(n) {
   return `${sign}$${Math.round(abs)}`;
 }
 
+function monthYearShort(iso) {
+  const [y, m] = iso.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+// Picks which checkpoints get an axis label so they land roughly every 6
+// calendar months apart (e.g. "Jan 2025", "Jun 2025", "Dec 2025") instead
+// of every Nth data point — checkpoint dates are real statement dates, not
+// evenly-spaced months, so an index-based step would drift.
+function pickTickIndices(points) {
+  const ym = (iso) => {
+    const [y, m] = iso.split('-').map(Number);
+    return y * 12 + (m - 1);
+  };
+
+  const indices = [];
+  let lastTickYM = null;
+  points.forEach((p, i) => {
+    const cur = ym(p.key);
+    if (lastTickYM === null || cur - lastTickYM >= 6) {
+      indices.push(i);
+      lastTickYM = cur;
+    }
+  });
+
+  const lastIdx = points.length - 1;
+  if (indices[indices.length - 1] !== lastIdx) {
+    if (ym(points[lastIdx].key) - lastTickYM >= 2) {
+      indices.push(lastIdx);
+    } else {
+      indices[indices.length - 1] = lastIdx;
+    }
+  }
+  return new Set(indices);
+}
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
@@ -104,14 +140,14 @@ export function renderNetWorthChart(container, points, series) {
     svg.appendChild(zeroLine);
   }
 
-  const step = points.length > 18 ? 3 : points.length > 9 ? 2 : 1;
+  const tickIndices = pickTickIndices(points);
   points.forEach((p, i) => {
-    if (i % step !== 0 && i !== points.length - 1) return;
+    if (!tickIndices.has(i)) return;
     const text = document.createElementNS(SVG_NS, 'text');
     text.setAttribute('x', xFor(i)); text.setAttribute('y', H - 8);
     text.setAttribute('class', 'trend-axis-label');
     text.setAttribute('text-anchor', 'middle');
-    text.textContent = p.label;
+    text.textContent = monthYearShort(p.key);
     svg.appendChild(text);
   });
 

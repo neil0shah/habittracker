@@ -271,6 +271,16 @@ button {
   flex-wrap: wrap;
   margin-bottom: 6px;
 }
+.account-toggle {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.account-toggle:hover { background: var(--track); color: var(--text); }
 .account-name-input {
   flex: 1;
   min-width: 140px;
