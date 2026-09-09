@@ -1,4 +1,4 @@
-# Personal Finance Analysis
+# Spending and Budgeting
 
 A single-page, local-only web app that turns PDF bank/credit-card statements
 into a spending summary — categorized, chartable, and filterable by date.

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Net Worth</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="../finance/index.html">← Finance</a>
+  <header>
+    <h1>My Net Worth</h1>
+    <p class="subtitle">
+      Upload statements from Bank of America, Robinhood, or Transamerica to track your net worth
+      over time. Everything is parsed and stored right here in your browser — nothing is uploaded
+      anywhere.
+    </p>
+  </header>
+
+  <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Upload account statements">
+    <div class="drop-zone-icon">📄</div>
+    <p><strong>Click to upload</strong> or drag and drop statement PDFs here</p>
+    <p class="drop-zone-hint">Bank of America, Robinhood, or Transamerica statements, one or more at a time</p>
+    <input id="file-input" type="file" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+
+  <div id="file-errors"></div>
+
+  <section id="summary" class="summary-grid" hidden>
+    <div class="stat-tile">
+      <div class="summary-label">Net worth</div>
+      <div id="net-worth-value" class="summary-value">$0.00</div>
+      <div id="net-worth-meta" class="summary-meta"></div>
+    </div>
+    <div class="stat-tile">
+      <div class="summary-label">Total assets</div>
+      <div id="total-assets" class="summary-value value-credit">$0.00</div>
+      <div id="assets-meta" class="summary-meta"></div>
+    </div>
+    <div class="stat-tile">
+      <div class="summary-label">Total liabilities</div>
+      <div id="total-liabilities" class="summary-value value-debit">$0.00</div>
+      <div id="liabilities-meta" class="summary-meta"></div>
+    </div>
+  </section>
+
+  <section id="chart-section" class="charts-section" hidden>
+    <div class="chart-card">
+      <h2>Net worth over time</h2>
+      <div id="net-worth-chart"></div>
+    </div>
+    <div class="chart-card">
+      <h2>By account</h2>
+      <div id="account-chart"></div>
+    </div>
+  </section>
+
+  <section id="accounts-section" class="table-section" hidden>
+    <h2>Accounts</h2>
+    <p class="table-hint">
+      Each statement you upload is matched to an account by institution and account number — a new
+      one is created automatically the first time. Every extracted balance and date is editable
+      right here, so a misread PDF is a quick fix, not a bad data point. A transfer between two of
+      your own accounts (e.g. Bank of America → Robinhood) is never double-counted: net worth is
+      the sum of each account's own latest balance, so one account's drop is simply offset by the
+      other's rise.
+    </p>
+    <div id="account-list"></div>
+  </section>
+
+  <div id="empty-state" class="empty-state" hidden>
+    <p>No accounts yet.</p>
+    <p class="empty-state-hint">
+      Upload a statement above, or add an account manually below to get started.
+    </p>
+  </div>
+
+  <div class="add-account-card">
+    <h3>Add an account manually</h3>
+    <p class="table-hint">For accounts without a statement to upload, or if a PDF doesn't parse.</p>
+    <form id="add-account-form" class="add-account-form">
+      <label class="filter-field">
+        <span>Institution</span>
+        <select id="new-account-institution">
+          <option value="Bank of America">Bank of America</option>
+          <option value="Robinhood">Robinhood</option>
+          <option value="Transamerica">Transamerica</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>Account name</span>
+        <input type="text" id="new-account-name" placeholder="e.g. Ally Savings" maxlength="60" required>
+      </label>
+      <label class="filter-field">
+        <span>Type</span>
+        <select id="new-account-kind">
+          <option value="asset">Asset (adds to net worth)</option>
+          <option value="liability">Liability (subtracts from net worth)</option>
+        </select>
+      </label>
+      <button type="submit" class="btn">Add account</button>
+    </form>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
