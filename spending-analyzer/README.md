@@ -56,6 +56,13 @@ and Web Workers from `file://` origins, so it needs to be served over
 - Statement type (bank account vs. credit card) is auto-detected per file
   and can be flipped manually from the dropdown next to each uploaded file
   if amounts look inverted.
+- Credit card refunds under "Payments and Other Credits" (or similarly
+  named sections) are parsed as positive transactions, same as any other
+  credit — including statements that print the minus sign with a space
+  before the amount (e.g. "- 51.96"). A recurring autopay line from a
+  linked checking/savings account (e.g. "…FROM CHK 1234") is categorized
+  as a Transfer rather than Income, since it's money moving between your
+  own accounts, not money coming in.
 - Any transaction's category can be changed by hand from its row, or in
   bulk for every transaction matching a search term — either way it's
   remembered for future uploads (see `rules.js` above), not just applied
