@@ -61,13 +61,17 @@ export async function parseStatementFile(file) {
     };
   }
 
+  // Anchored to each institution's own domain/legal name rather than a bare
+  // mention of it — a Bank of America statement can easily *contain* the
+  // word "Robinhood" (e.g. a transfer line like "ROBINHOOD DES:DEBITS...")
+  // without being one.
   const lower = fullText.toLowerCase();
   let result;
-  if (lower.includes('robinhood')) {
+  if (lower.includes('robinhood.com') || lower.includes('robinhood securities') || lower.includes('robinhood financial')) {
     result = parseRobinhood(fullText);
-  } else if (lower.includes('transamerica')) {
+  } else if (lower.includes('transamerica.com')) {
     result = parseTransamerica(fullText);
-  } else if (lower.includes('bank of america')) {
+  } else if (lower.includes('bankofamerica.com') || lower.includes('bank of america, n.a.')) {
     result = parseBankOfAmerica(fullText);
   } else {
     return {
@@ -241,27 +245,50 @@ function parseBankOfAmerica(fullText) {
     };
   }
 
-  // Bank account (checking/savings), or unrecognized BoA layout — either
-  // way, look for the same "ending balance" phrasing all BoA deposit
-  // statements use.
-  const balanceMatch = fullText.match(/Ending balance(?:\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4}))?\s*\$?\s*([\d,]+\.\d{2})/i);
+  // Bank account (checking/savings), or unrecognized BoA layout. BoA often
+  // sends one "combined statement" covering several deposit accounts (e.g.
+  // checking + savings) at once — in that case "Total balance" is the sum
+  // across all of them, and using any single account's "Ending balance"
+  // instead would silently drop the others. So look for a combined total
+  // first, and only fall back to a single account's ending balance when
+  // there isn't one.
+  const totalMatch = fullText.match(/Total balance\s*\$?\s*([\d,]+\.\d{2})/i);
+  if (totalMatch) {
+    const periodMatch = fullText.match(/for [A-Za-z]+ \d{1,2},\s*\d{4}\s+to\s+([A-Za-z]+ \d{1,2},\s*\d{4})/i);
+    const date = periodMatch ? monthNameDateToISO(periodMatch[1]) : findLatestDate(fullText);
+    if (!date) return { error: `Found a "Total balance" but couldn't find the statement period end date.` };
+
+    return {
+      institution: 'Bank of America',
+      accountKey: 'boa:deposits',
+      accountLabel: 'Bank of America Checking & Savings',
+      kind: 'asset',
+      date,
+      balance: toAmount(totalMatch[1]),
+    };
+  }
+
+  const balanceMatch = fullText.match(
+    /Ending balance(?:\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4}|[A-Za-z]+ \d{1,2},\s*\d{4}))?\s*\$?\s*([\d,]+\.\d{2})/i
+  );
   if (!balanceMatch) {
     return {
       error: isBankAccount
-        ? `Recognized this as a Bank of America deposit account statement but couldn't find an "Ending balance" line.`
+        ? `Recognized this as a Bank of America deposit account statement but couldn't find a "Total balance" or "Ending balance" line.`
         : `Recognized this as a Bank of America statement but couldn't tell if it's a card or a deposit account, ` +
           `and couldn't find a balance line either way.`,
     };
   }
 
   let date = null;
-  if (balanceMatch[1]) {
+  if (balanceMatch[1]?.includes('/')) {
     const [mm, dd, yy] = balanceMatch[1].split('/');
     const year = yy.length === 2 ? (parseInt(yy, 10) < 70 ? `20${yy}` : `19${yy}`) : yy;
     date = `${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-  } else {
-    date = findLatestDate(fullText);
+  } else if (balanceMatch[1]) {
+    date = monthNameDateToISO(balanceMatch[1]);
   }
+  if (!date) date = findLatestDate(fullText);
   if (!date) return { error: `Found a balance but couldn't find the statement date.` };
 
   return {

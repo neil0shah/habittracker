@@ -31,8 +31,12 @@ Web Workers from `file://` origins, so it needs to be served over `http://`.)
   ending balance) from a statement PDF using
   [pdf.js](https://mozilla.github.io/pdf.js/) for text extraction.
   Institution-specific, since each one prints its balance differently:
-  - **Bank of America**: "New Balance Total" (credit card, a liability) or
-    "Ending balance" (checking/savings, an asset).
+  - **Bank of America**: "New Balance Total" (credit card, a liability), or
+    for checking/savings — "Total balance" when a statement combines
+    multiple deposit accounts (the common case, since BoA typically sends
+    one combined statement for checking and savings together), falling
+    back to a single account's "Ending balance" otherwise. Either way it's
+    an asset.
   - **Robinhood**: "Portfolio Value" closing balance (an asset).
   - **Transamerica**: "Ending Balance" (retirement account, an asset).
 - **`charts.js`** — the net-worth-over-time line chart and per-account
@@ -62,6 +66,12 @@ statement for it.
 
 ## Notes
 
+- Which institution a statement is from is detected by its own domain or
+  legal name (e.g. "bankofamerica.com", "robinhood.com"), not just any
+  mention of that word — a Bank of America statement's own transaction
+  list can easily contain a line like "ROBINHOOD DES:DEBITS..." for a
+  transfer out to Robinhood, which shouldn't cause it to be read as a
+  Robinhood statement.
 - Every extracted balance and date is shown as an editable field in the
   account's history table — a misread PDF (or a number you just want to
   correct) is a one-click fix, not something you have to re-upload to fix.
