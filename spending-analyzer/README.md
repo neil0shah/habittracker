@@ -77,7 +77,13 @@ and Web Workers from `file://` origins, so it needs to be served over
   flip it. That correction is remembered the same way category edits are.
 - The uploaded-statements list can be collapsed (click the "N statements
   uploaded" toggle) once you've got a few files loaded and don't need to
-  see them all the time.
+  see them all the time. Inside it, statements are grouped by the month
+  they cover (their latest transaction's date), newest first.
+- Above the statement list, a card per statement type (credit card, bank
+  account) always shows the most recent month you've uploaded and the next
+  month expected — turning amber ("due now") once that month starts, and
+  red ("overdue") once it's passed — so this section doubles as a reminder
+  of what's left to upload, even while the list itself is collapsed.
 - Table filters: click category chips to filter by one or more categories
   at once (e.g. Rent + Other together), plus Type, a minimum amount, and
   an "Amount is exactly" search to find a specific transaction by its
