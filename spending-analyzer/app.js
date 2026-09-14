@@ -5,6 +5,11 @@ import { loadRules, saveRules, upsertRule, applyRules, normalizeDescription } fr
 
 const STORAGE_KEY = 'spendingAnalyzer.v1.files';
 
+const DOCUMENT_TYPE_LABELS = {
+  bank_account: 'Bank / Checking Account',
+  credit_card: 'Credit Card',
+};
+
 /** @type {Array<{
  *   id: string, fileName: string, uploadedAt: string,
  *   accountKind: 'credit_card'|'bank_account', detectedType: string,
@@ -39,6 +44,7 @@ const el = {
   dropZone: document.getElementById('drop-zone'),
   fileInput: document.getElementById('file-input'),
   fileErrors: document.getElementById('file-errors'),
+  uploadStatus: document.getElementById('upload-status'),
   fileList: document.getElementById('file-list'),
   fileListToggle: document.getElementById('file-list-toggle'),
   fileListToggleLabel: document.getElementById('file-list-toggle-label'),
@@ -651,6 +657,7 @@ function monthLabel(ym) {
 
 function render() {
   renderFileErrors();
+  renderUploadStatus();
   renderFileList();
   renderRulesControl();
   renderCategoryChips();
@@ -866,6 +873,68 @@ function renderFileErrors() {
   });
 }
 
+// The month a statement "belongs to" for reminder/grouping purposes — the
+// latest transaction date in it, which lands on or right around the
+// statement's actual closing date regardless of institution or layout.
+function computeFilePeriodMonth(f) {
+  if (!f.transactions || f.transactions.length === 0) return null;
+  return f.transactions.reduce((max, t) => (t.date > max ? t.date : max), f.transactions[0].date).slice(0, 7);
+}
+
+// One card per statement type (credit card vs. bank account) showing the
+// most recent month on file and the next month that should show up —
+// meant to be glanceable even with the file list collapsed, so it works as
+// an upload reminder.
+function renderUploadStatus() {
+  const latestByType = new Map(); // accountKind -> { month, fileName }
+  for (const f of files) {
+    const month = computeFilePeriodMonth(f);
+    if (!month) continue;
+    const existing = latestByType.get(f.accountKind);
+    if (!existing || month > existing.month) {
+      latestByType.set(f.accountKind, { month, fileName: f.fileName });
+    }
+  }
+
+  el.uploadStatus.hidden = latestByType.size === 0;
+  el.uploadStatus.innerHTML = '';
+  if (latestByType.size === 0) return;
+
+  const currentYM = todayISO().slice(0, 7);
+
+  [...latestByType.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([kind, info]) => {
+    const nextYM = addMonthsYM(info.month, 1);
+    const overdue = nextYM < currentYM;
+    const dueNow = nextYM === currentYM;
+
+    const card = document.createElement('div');
+    card.className = 'upload-status-card' + (overdue ? ' overdue' : dueNow ? ' due-now' : '');
+
+    const typeEl = document.createElement('div');
+    typeEl.className = 'upload-status-type';
+    typeEl.textContent = DOCUMENT_TYPE_LABELS[kind] || kind;
+
+    const latestEl = document.createElement('div');
+    latestEl.className = 'upload-status-line';
+    latestEl.append('Latest uploaded: ');
+    const latestStrong = document.createElement('strong');
+    latestStrong.textContent = monthLabel(info.month);
+    latestEl.appendChild(latestStrong);
+
+    const nextEl = document.createElement('div');
+    nextEl.className = 'upload-status-line';
+    nextEl.append('Next expected: ');
+    const nextStrong = document.createElement('strong');
+    nextStrong.textContent = monthLabel(nextYM);
+    nextEl.appendChild(nextStrong);
+    if (overdue) nextEl.append(' — overdue');
+    else if (dueNow) nextEl.append(' — due now');
+
+    card.append(typeEl, latestEl, nextEl);
+    el.uploadStatus.appendChild(card);
+  });
+}
+
 function renderFileList() {
   el.fileListToggle.hidden = files.length === 0;
   if (files.length > 0) {
@@ -876,48 +945,65 @@ function renderFileList() {
   el.fileList.hidden = files.length > 0 && fileListCollapsed;
 
   el.fileList.innerHTML = '';
+
+  const byMonth = new Map();
   files.forEach((f) => {
-    const row = document.createElement('div');
-    row.className = 'file-row';
-
-    const info = document.createElement('div');
-    info.className = 'file-info';
-    const name = document.createElement('span');
-    name.className = 'file-name';
-    name.textContent = f.fileName;
-    const count = document.createElement('span');
-    count.className = 'file-count';
-    count.textContent = `${f.transactions.length} transaction${f.transactions.length === 1 ? '' : 's'}`;
-    info.append(name, count);
-
-    if (f.warnings?.length) {
-      const warn = document.createElement('div');
-      warn.className = 'file-warning';
-      warn.textContent = f.warnings.join(' ');
-      info.appendChild(warn);
-    }
-
-    const kindSelect = document.createElement('select');
-    kindSelect.className = 'kind-select';
-    kindSelect.title = 'Statement type — flip this if amounts look inverted';
-    [['bank_account', 'Bank / checking account'], ['credit_card', 'Credit card']].forEach(([val, label]) => {
-      const opt = document.createElement('option');
-      opt.value = val;
-      opt.textContent = label;
-      if (f.accountKind === val) opt.selected = true;
-      kindSelect.appendChild(opt);
-    });
-    kindSelect.addEventListener('change', () => setAccountKind(f.id, kindSelect.value));
-
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'icon-btn danger';
-    removeBtn.textContent = '✕';
-    removeBtn.title = 'Remove this statement';
-    removeBtn.addEventListener('click', () => removeFile(f.id));
-
-    row.append(info, kindSelect, removeBtn);
-    el.fileList.appendChild(row);
+    const key = computeFilePeriodMonth(f) || 'unknown';
+    if (!byMonth.has(key)) byMonth.set(key, []);
+    byMonth.get(key).push(f);
   });
+
+  [...byMonth.keys()].sort((a, b) => b.localeCompare(a)).forEach((key) => {
+    const header = document.createElement('div');
+    header.className = 'file-month-header';
+    header.textContent = key === 'unknown' ? 'Unknown period' : monthLabel(key);
+    el.fileList.appendChild(header);
+
+    byMonth.get(key).forEach((f) => el.fileList.appendChild(buildFileRow(f)));
+  });
+}
+
+function buildFileRow(f) {
+  const row = document.createElement('div');
+  row.className = 'file-row';
+
+  const info = document.createElement('div');
+  info.className = 'file-info';
+  const name = document.createElement('span');
+  name.className = 'file-name';
+  name.textContent = f.fileName;
+  const count = document.createElement('span');
+  count.className = 'file-count';
+  count.textContent = `${f.transactions.length} transaction${f.transactions.length === 1 ? '' : 's'}`;
+  info.append(name, count);
+
+  if (f.warnings?.length) {
+    const warn = document.createElement('div');
+    warn.className = 'file-warning';
+    warn.textContent = f.warnings.join(' ');
+    info.appendChild(warn);
+  }
+
+  const kindSelect = document.createElement('select');
+  kindSelect.className = 'kind-select';
+  kindSelect.title = 'Statement type — flip this if amounts look inverted';
+  [['bank_account', 'Bank / checking account'], ['credit_card', 'Credit card']].forEach(([val, label]) => {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    if (f.accountKind === val) opt.selected = true;
+    kindSelect.appendChild(opt);
+  });
+  kindSelect.addEventListener('change', () => setAccountKind(f.id, kindSelect.value));
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'icon-btn danger';
+  removeBtn.textContent = '✕';
+  removeBtn.title = 'Remove this statement';
+  removeBtn.addEventListener('click', () => removeFile(f.id));
+
+  row.append(info, kindSelect, removeBtn);
+  return row;
 }
 
 function compareTxnsBy(a, b, column) {

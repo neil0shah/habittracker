@@ -188,6 +188,38 @@ button {
 .collapsible-header:hover { color: var(--text); }
 .collapsible-header .chevron { font-size: 11px; }
 
+.upload-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.upload-status-card {
+  flex: 1;
+  min-width: 200px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+}
+.upload-status-card.due-now { border-color: color-mix(in srgb, #d97706 50%, var(--border)); }
+.upload-status-card.overdue { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); }
+.upload-status-type { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+.upload-status-line { font-size: 13px; }
+.upload-status-card.due-now .upload-status-line:last-child { color: #d97706; }
+.upload-status-card.overdue .upload-status-line:last-child { color: var(--danger); }
+
+.file-month-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin: 14px 0 6px;
+}
+.file-month-header:first-child { margin-top: 0; }
+
 .file-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
 .file-row {
   display: flex;
